@@ -1,6 +1,6 @@
 import {backtest,trainVisual,validateCandles} from './research.mjs';
 const API='https://making-money-api.vercel.app',el=id=>document.getElementById(id);
-let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false;
+let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false,accountRole='member';
 const status=(id,text)=>{if(el(id))el(id).textContent=text;};
 const minutes=()=>({'1 minute':1,'5 minutes':5,'15 minutes':15,'30 minutes':30,'1 hour':60}[el('tf').value]);
 const selection=()=>({symbol:el('pair').value,minutes:minutes()});
@@ -10,9 +10,14 @@ async function call(op,body,method='POST'){
  const data=await response.json();if(!response.ok)throw Error(data.error||'Service unavailable.');return data;
 }
 window.MMAuthHeaders=()=>session?{Authorization:'Bearer '+session.access_token}:{};
+async function refreshAccount(){
+ const identity=session?.user?.id;if(!identity){accountRole='member';return;}
+ try{const a=await call('account',null,'GET');if(session?.user?.id!==identity)return;accountRole=a.role||'member';window.MMAuth.setAccount(a);updateControls();status('accountStatus',a.email+' · '+(a.role==='owner'?'Owner access':('Plan: '+a.status)));}
+ catch(e){if(session?.user?.id===identity){accountRole='member';status('accountStatus','Signed in. Account access could not be verified: '+e.message);}}
+}
 function current(){return window.MMMonitorState?.();}
 function updateControls(){
- const signed=!!session;el('loginForm').hidden=signed||!config?.auth;el('logout').hidden=!signed;
+ const signed=!!session;el('loginForm').hidden=signed||!config?.auth;el('logout').hidden=!signed;el('subscribePlan').hidden=el('managePlan').hidden=accountRole==='owner';
  for(const [id,key] of [['extendHistory','history'],['archivePrices','database'],['importHistory','history'],['loadArchive','database'],['saveVisual','database'],['enablePush','push'],['disablePush','push'],['loadNews','news'],['subscribePlan','billing'],['managePlan','billing']])el(id).disabled=!(signed&&config?.[key]);
 }
 function stopStream(){streamEpoch++;clearTimeout(retry);retry=null;if(socket){socket.onclose=null;socket.close();socket=null;}streamState=null;}
@@ -121,14 +126,16 @@ async function boot(){
  async function sendLogin(form,input,feedback){
   const button=form.querySelector('button[type="submit"]');button.disabled=true;
   try{if(!auth)throw Error('Secure sign-in is not ready. Please try again shortly.');
-   const {error}=await auth.auth.signInWithOtp({email:input.value.trim(),options:{emailRedirectTo:location.origin+location.pathname}});
+   const value=input.value.trim();if(!value.includes('@')){const r=await call('owner-login',{username:value});status(feedback,r.message);return;}
+   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))throw Error('Enter a valid email address or your assigned username.');
+   const {error}=await auth.auth.signInWithOtp({email:value,options:{emailRedirectTo:location.origin+location.pathname}});
    if(error)throw Error('The sign-in email could not be sent. Check your address or try again later.');
    status(feedback,'Check your inbox for the secure sign-in link. Gmail addresses are supported.');
   }catch(e){status(feedback,e.message);}finally{button.disabled=false;}
  }
  el('loginForm').addEventListener('submit',e=>{e.preventDefault();sendLogin(e.currentTarget,el('accountEmail'),'accountStatus');});
  el('modalLoginForm').addEventListener('submit',e=>{e.preventDefault();sendLogin(e.currentTarget,el('modalEmail'),'loginFeedback');});
- el('logout').onclick=async()=>{await auth?.auth.signOut();session=null;window.MMAuth.setSession(null);updateControls();stopStream();status('accountStatus','Signed out.');};
+ el('logout').onclick=async()=>{await auth?.auth.signOut();session=null;accountRole='member';window.MMAuth.setSession(null);updateControls();stopStream();status('accountStatus','Signed out.');};
  try{el('autoHistory').checked=localStorage.getItem('mm-auto-history')!=='false';}catch{}
  el('autoHistory').onchange=()=>{try{localStorage.setItem('mm-auto-history',String(el('autoHistory').checked));}catch{}};
  window.addEventListener('mmprices',e=>receive(e.detail));
@@ -141,10 +148,10 @@ async function boot(){
   status('servicesStatus','Server archive: '+(config.database?'configured':'setup required')+' · background alerts: '+(config.push?'configured':'setup required')+' · news: '+(config.news?'configured':'setup required')+' · subscriptions: '+(config.billing?'configured':'setup required')+'.');
   status('accountStatus',config.auth?'Sign in to analyze markets and use server features.':'Accounts and server history are awaiting service setup. Live analysis and local research remain available.');
   if(config.auth){const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2.57.4');auth=createClient(config.public.supabaseUrl,config.public.supabaseKey);const {data}=await auth.auth.getSession();session=data.session;
-   auth.auth.onAuthStateChange((_event,next)=>{session=next;window.MMAuth.setSession(next);updateControls();startStream();status('accountStatus',session?'Signed in: '+session.user.email:'Signed out.');});
-   if(session){const a=await call('account',null,'GET');status('accountStatus',a.email+' · Plan: '+a.status);}
+   auth.auth.onAuthStateChange((_event,next)=>{session=next;if(!next)accountRole='member';window.MMAuth.setSession(next);updateControls();startStream();status('accountStatus',session?'Signed in: '+session.user.email:'Signed out.');if(next)setTimeout(refreshAccount,0);});
+   if(session)await refreshAccount();
   }
-  window.MMAuth.setSession(session);updateControls();startStream();
+  window.MMAuth.setSession(session);if(session)await refreshAccount();updateControls();startStream();
  }catch(e){status('servicesStatus','Server feature status unavailable: '+e.message);updateControls();startStream();}
 }
 boot();

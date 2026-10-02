@@ -14,8 +14,15 @@
     signedIn: () => signed,
     require(action) { if (signed) return true; open(action); return false; },
     open,
+    setAccount(account) {
+      const owner = signed && account.role === 'owner';
+      document.getElementById('profileBadge').textContent = owner ? 'Owner' : signed ? 'Signed in' : 'Guest';
+      const username = document.getElementById('profileUsername');
+      username.hidden = !owner; username.textContent = owner ? 'Username: ' + account.username : '';
+      document.getElementById('ownerAccess').hidden = !owner;
+    },
     setSession(next) {
-      ready = true; signed = !!next;
+      ready = true; signed = !!next;if(!signed){document.getElementById('profileUsername').hidden=true;document.getElementById('ownerAccess').hidden=true;}
       document.getElementById('profileEmail').textContent = next?.user?.email || 'Sign in to access analysis and your server archive.';
       document.getElementById('profileBadge').textContent = signed ? 'Signed in' : 'Guest';
       document.getElementById('navLogin').textContent = signed ? 'My profile' : 'Sign in';

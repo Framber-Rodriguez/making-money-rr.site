@@ -33,13 +33,13 @@
   </details>
   <p id="servicesStatus">Checking connected services…</p><p id="serviceFeedback" role="status"></p>
 </section>
-<section id="profile" class="profileCard"><div class="toolbar"><div><p class="eyebrow">YOUR ACCOUNT</p><h2>Profile</h2></div><span id="profileBadge" class="badge">Guest</span></div><p id="profileEmail">Sign in to access analysis and your server archive.</p>    <p id="accountStatus">Checking account service…</p>
-    <form id="loginForm" hidden><label>Email<input id="accountEmail" type="email" required autocomplete="email"></label><button type="submit">Send secure sign-in link</button></form>
+<section id="profile" class="profileCard"><div class="toolbar"><div><p class="eyebrow">YOUR ACCOUNT</p><h2>Profile</h2></div><span id="profileBadge" class="badge">Guest</span></div><p id="ownerAccess" class="small" hidden>Your owner account has access to all configured features without a subscription. Provider quotas and service setup still apply.</p><p id="profileUsername" class="small" hidden></p><p id="profileEmail">Sign in to access analysis and your server archive.</p>    <p id="accountStatus">Checking account service…</p>
+    <form id="loginForm" hidden><label>Email or username<input id="accountEmail" type="text" required autocomplete="username"></label><button type="submit">Send secure sign-in link</button></form>
     <button id="logout" hidden>Sign out</button>
-<p class="small">Use your email address, including Gmail. You receive a secure sign-in link; no password is required.</p></section>
-<dialog id="loginDialog" aria-labelledby="loginTitle"><button id="closeLogin" type="button" class="dialogClose" aria-label="Close sign-in">×</button><p class="eyebrow">MAKING MONEY</p><h2 id="loginTitle">Sign in to analyze</h2><p>Enter your email or Gmail address. We will send a secure sign-in link.</p><form id="modalLoginForm"><label>Email<input id="modalEmail" type="email" required autocomplete="email" placeholder="you@gmail.com"></label><button id="sendLogin" type="submit">Send sign-in link</button></form><p id="loginFeedback" role="status"></p></dialog></main>
+<p class="small">Use your email address or assigned username. You receive a secure sign-in link; no password is required.</p></section>
+<dialog id="loginDialog" aria-labelledby="loginTitle"><button id="closeLogin" type="button" class="dialogClose" aria-label="Close sign-in">×</button><p class="eyebrow">MAKING MONEY</p><h2 id="loginTitle">Sign in to analyze</h2><p>Enter your email or assigned username. We will send a secure sign-in link to your account email.</p><form id="modalLoginForm"><label>Email or username<input id="modalEmail" type="text" required autocomplete="username" placeholder="you@gmail.com or your username"></label><button id="sendLogin" type="submit">Send sign-in link</button></form><p id="loginFeedback" role="status"></p></dialog></main>
 
-<script src="auth-gate.js?v=1"></script><script src="scanner.js?v=8"></script><script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script><script src="dashboard.js?v=2"></script><script src="app.js?v=12"></script><script src="languages.js?v=6"></script><script src="github-pages-addon.js?v=2"></script><script type="module" src="engine.js?v=2"></script>
+<script src="auth-gate.js?v=2"></script><script src="scanner.js?v=8"></script><script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script><script src="dashboard.js?v=2"></script><script src="app.js?v=12"></script><script src="languages.js?v=6"></script><script src="github-pages-addon.js?v=2"></script><script type="module" src="engine.js?v=3"></script>
 </body></html>
 
 
