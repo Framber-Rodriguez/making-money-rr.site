@@ -6,6 +6,7 @@
   if(![5,10,30].includes(minutes)||!Number.isInteger(h)||h<1)return {available:false,reason:'Use 1- or 5-minute candles for 5/10-minute forecasts. Larger candles cannot resolve the requested future close.'};
   const key=[minutes,data.length,data[0].timestamp,last.timestamp,last.close,data.reduce((s,r)=>s+r.close+r.high+r.low,0)].join('|');if(cache.has(key))return cache.get(key);
   const features=new Map(),gaps=[0];for(let i=1;i<data.length;i++)gaps[i]=gaps[i-1]+(data[i].timestamp-data[i-1].timestamp===step?0:1);
+  if(gaps.at(-1)!==gaps[data.length-21])return {available:false,reason:'Recent price history contains gaps. Refresh a continuous sequence of closed candles.'};
   function feature(i){if(features.has(i))return features.get(i);const win=data.slice(i-20,i+1),close=data[i].close,avg=win.slice(-20).reduce((s,r)=>s+r.close,0)/20,hi=Math.max(...win.map(r=>r.high)),lo=Math.min(...win.map(r=>r.low));
    let atr=0;for(let j=i-13;j<=i;j++)atr+=Math.max(data[j].high-data[j].low,Math.abs(data[j].high-data[j-1].close),Math.abs(data[j].low-data[j-1].close));atr/=14;
    const r={atr,x:[1,(close-data[i-3].close)/(atr||1),(close-avg)/(atr||1),(close-lo)/(hi-lo||1)-.5]};features.set(i,r);return r;

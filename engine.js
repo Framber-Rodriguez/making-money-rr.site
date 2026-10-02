@@ -147,6 +147,7 @@ async function boot(){
  const initial=current();if(initial?.rows?.length)receive(initial);running=!!initial?.active;
  try{
   config=await call('config',null,'GET');
+  status('billingAvailability',config.billing?'Sign in to access secure subscription checkout.':'Subscription checkout is awaiting payment-service setup. No payment can be taken yet.');
   status('servicesStatus','Server archive: '+(config.database?'configured':'setup required')+' · background alerts: '+(config.push?'configured':'setup required')+' · news: '+(config.news?'configured':'setup required')+' · subscriptions: '+(config.billing?'configured':'setup required')+'.');
   status('accountStatus',config.auth?'Sign in to analyze markets and use server features.':'Accounts and server history are awaiting service setup. Live analysis and local research remain available.');
   if(config.auth){const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2.57.4');auth=createClient(config.public.supabaseUrl,config.public.supabaseKey);const {data}=await auth.auth.getSession();session=data.session;
