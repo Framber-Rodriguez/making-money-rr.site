@@ -1,57 +1,37 @@
 (() => {
-  let signed = false, ready = false, pending = '';
-  const dialog = () => document.getElementById('loginDialog');
-  function open(action = '') {
-    pending = action;
-    try { sessionStorage.setItem('mm-pending-analysis', action); } catch {}
-    const d = dialog();
-    if (d && !d.open) d.showModal();
-    const feedback = document.getElementById('loginFeedback');
-    if (feedback) feedback.textContent = ready ? '' : 'Connecting secure sign-in…';
-    document.getElementById('modalEmail')?.focus();
+ let signed=false,ready=false,pending='',access=null,expires=0,lastAllowed=false;
+ const $=id=>document.getElementById(id),allowed=()=>signed&&!!access?.allowed&&(!expires||performance.now()<expires);
+ const dialog=()=>$('loginDialog');
+ function profile(){const d=$('profileDialog');if(!d.open)d.showModal();$('appMenu').open=false;}
+ function open(action=''){pending=action;try{sessionStorage.setItem('mm-pending-analysis',action);}catch{}if(!dialog().open)dialog().showModal();$('loginFeedback').textContent=ready?'':'Connecting secure sign-in…';$('appMenu').open=false;}
+ function paint(){
+  const active=allowed(),owner=signed&&access?.role==='owner';document.body.classList.toggle('analysisAccess',active);
+  if(lastAllowed&&!active)window.MMstopAnalysis?.();lastAllowed=active;
+  const seconds=expires?Math.max(0,Math.ceil((expires-performance.now())/1000)):0;
+  const label=!signed?'Sign in for a 15-minute trial':!access?'Verifying access…':owner?'Owner · full access':access.status==='subscribed'?'Subscription active':active?'Trial · '+Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')+' remaining':'Trial ended · subscription required';
+  $('accessStatus').textContent=label;$('profileAccess').textContent=label;
+  $('accessTitle').textContent=signed?'Your trial has ended':'Explore markets. Sign in for analysis.';
+  $('accessDescription').textContent=signed?'Subscribe to restore analysis, research and alerts. Your account stays signed in.':'Start a single 15-minute trial after verified sign-in. Subscribe to continue afterward.';
+  if(signed&&!access){$('accessTitle').textContent='Checking your account';$('accessDescription').textContent='Analysis stays hidden until the server verifies access.';}
+  $('accessAction').textContent=signed?'View subscription':'Start free trial';
+  $('profileBadge').textContent=owner?'Owner':signed?'Signed in':'Guest';$('ownerAccess').hidden=!owner;
+  window.dispatchEvent(new Event('mmaccess'));
+ }
+ window.MMAuth={signedIn:allowed,hasSession:()=>signed,open,openProfile:profile,
+  require(action){if(allowed())return true;if(signed){profile();return false;}open(action);return false;},
+  setAccount(account){access=account.access||null;expires=access?.trialEndsAt?performance.now()+Math.max(0,access.trialEndsAt-access.serverNow):0;
+   const owner=signed&&account.role==='owner';$('profileUsername').hidden=!owner;$('profileUsername').textContent=owner?'Username: '+account.username:'';
+   $('billingAvailability').textContent=access?.billingReady?'Secure subscription checkout is available.':'Subscription checkout is awaiting payment-service setup. No payment can be taken yet.';paint();
+   if(allowed()&&pending){const action=pending;pending='';try{sessionStorage.removeItem('mm-pending-analysis');}catch{}if(['monitor','analyze'].includes(action))setTimeout(()=>$('live').click(),0);}
+  },
+  setSession(next){const changed=signed!==!!next;ready=true;signed=!!next;if(changed||!signed){access=null;expires=0;}
+   $('profileEmail').textContent=next?.user?.email||'Sign in to access analysis and your server archive.';$('navLogin').textContent=signed?'My profile':'Sign in';
+   if(signed){dialog()?.close();try{pending ||= sessionStorage.getItem('mm-pending-analysis')||'';}catch{}}else{$('profileUsername').hidden=true;window.MMstopAnalysis?.();}paint();window.dispatchEvent(new Event('mmauth'));
   }
-  window.MMAuth = {
-    signedIn: () => signed,
-    require(action) { if (signed) return true; open(action); return false; },
-    open,
-    setAccount(account) {
-      const owner = signed && account.role === 'owner';
-      document.getElementById('profileBadge').textContent = owner ? 'Owner' : signed ? 'Signed in' : 'Guest';
-      const username = document.getElementById('profileUsername');
-      username.hidden = !owner; username.textContent = owner ? 'Username: ' + account.username : '';
-      document.getElementById('ownerAccess').hidden = !owner;
-    },
-    setSession(next) {
-      ready = true; signed = !!next;if(!signed){document.getElementById('profileUsername').hidden=true;document.getElementById('ownerAccess').hidden=true;}
-      document.getElementById('profileEmail').textContent = next?.user?.email || 'Sign in to access analysis and your server archive.';
-      document.getElementById('profileBadge').textContent = signed ? 'Signed in' : 'Guest';
-      document.getElementById('navLogin').textContent = signed ? 'My profile' : 'Sign in';
-      if (signed) {
-        dialog()?.close();
-        try { pending ||= sessionStorage.getItem('mm-pending-analysis') || ''; sessionStorage.removeItem('mm-pending-analysis'); } catch {}
-        if (['monitor', 'analyze'].includes(pending)) setTimeout(() => document.getElementById('live').click(), 0);
-        pending = '';
-      } else window.MMstopAnalysis?.();
-      window.dispatchEvent(new Event('mmauth'));
-    }
-  };
-  // Stop analysis clicks before older handlers can fetch data or calculate signals.
-  document.addEventListener('click', e => {
-    const button = e.target.closest('button');
-    const protectedIds = ['live','analyzeMarket','aiAnalyze','runBacktest','trainVisual'];
-    if (button && protectedIds.includes(button.id) && !signed) {
-      e.preventDefault(); e.stopImmediatePropagation();
-      open(button.id === 'live' ? 'monitor' : button.id === 'analyzeMarket' ? 'analyze' : button.id);
-    }
-  }, true);
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('navLogin').onclick = () => signed ? document.getElementById('profile').scrollIntoView({behavior:'smooth'}) : open();
-    document.getElementById('closeLogin').onclick = () => dialog().close();
-    document.querySelectorAll('.mainNav a').forEach(link => link.addEventListener('click', () => {
-      document.querySelectorAll('.mainNav a').forEach(x => x.removeAttribute('aria-current'));
-      link.setAttribute('aria-current','page');
-      const target = document.querySelector(link.getAttribute('href'));
-      if (target?.tagName === 'DETAILS') target.open = true;
-    }));
-  });
+ };
+ document.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&['live','analyzeMarket','aiAnalyze','runBacktest','trainVisual','exportHistory'].includes(b.id)&&!allowed()){e.preventDefault();e.stopImmediatePropagation();window.MMAuth.require(b.id==='live'?'monitor':b.id==='analyzeMarket'?'analyze':b.id);}},true);
+ document.addEventListener('DOMContentLoaded',()=>{
+  $('navLogin').onclick=()=>signed?profile():open();$('menuProfile').onclick=profile;$('closeProfile').onclick=()=>$('profileDialog').close();$('closeLogin').onclick=()=>dialog().close();$('accessAction').onclick=()=>signed?profile():open('monitor');
+  document.querySelectorAll('.mainNav a').forEach(link=>link.addEventListener('click',e=>{$('appMenu').open=false;const target=document.querySelector(link.getAttribute('href'));if(target?.closest('[data-benefit]')&&!allowed()){e.preventDefault();window.MMAuth.require('research');return;}if(target?.tagName==='DETAILS')target.open=true;}));paint();setInterval(()=>{if(signed&&access?.trialEndsAt)paint();},1000);
+ });
 })();

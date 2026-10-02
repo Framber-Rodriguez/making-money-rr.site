@@ -1,12 +1,12 @@
 (() => {
  const $=id=>document.getElementById(id);
  function summarize(data,evaluate){
-  const outcomes=[],markers=[];let nextEligible=0;
+  const outcomes=[],markers=[],timeIndex=new Map(data.map((r,i)=>[r.timestamp,i]));let nextEligible=0;
   for(let i=29;i<data.length;i++){
-   const e=evaluate(data.slice(0,i+1));if(e.side==='Wait')continue;
+   const e=evaluate(data.slice(Math.max(0,i-20),i+1));if(e.side==='Wait')continue;
    markers.push({time:Math.floor(data[i].timestamp/1000),position:e.side==='Buy'?'belowBar':'aboveBar',color:e.side==='Buy'?'#3be5af':'#ff7a8a',shape:e.side==='Buy'?'arrowUp':'arrowDown',text:e.side+' setup'});
    if(i<nextEligible)continue;
-   const end=data[i].timestamp+1800000,j=data.findIndex((r,k)=>k>i&&r.timestamp>=end);
+   const end=data[i].timestamp+1800000,j=timeIndex.get(end)??-1;
    if(j<0||data[j].timestamp!==end)continue;
    const gaps=data.slice(i+1,j+1).map((r,k)=>r.timestamp-data[i+k].timestamp);if(gaps.some(g=>g!==gaps[0]))continue;
    const delta=(data[j].close-data[i].close)*(e.side==='Buy'?1:-1);

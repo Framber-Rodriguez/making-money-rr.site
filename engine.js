@@ -18,11 +18,11 @@ async function refreshAccount(){
 function current(){return window.MMMonitorState?.();}
 function updateControls(){
  const signed=!!session;el('loginForm').hidden=signed||!config?.auth;el('logout').hidden=!signed;el('subscribePlan').hidden=el('managePlan').hidden=accountRole==='owner';
- for(const [id,key] of [['extendHistory','history'],['archivePrices','database'],['importHistory','history'],['loadArchive','database'],['saveVisual','database'],['enablePush','push'],['disablePush','push'],['loadNews','news'],['subscribePlan','billing'],['managePlan','billing']])el(id).disabled=!(signed&&config?.[key]);
+ for(const [id,key] of [['extendHistory','history'],['archivePrices','database'],['importHistory','history'],['loadArchive','database'],['saveVisual','database'],['enablePush','push'],['disablePush','push'],['loadNews','news'],['subscribePlan','billing'],['managePlan','billing']])el(id).disabled=!(signed&&config?.[key]&&(['subscribePlan','managePlan'].includes(id)||window.MMAuth.signedIn()));
 }
 function stopStream(){streamEpoch++;clearTimeout(retry);retry=null;if(socket){socket.onclose=null;socket.close();socket=null;}streamState=null;}
 function startStream(){
- stopStream();if(!running)return;const state=current();if(!state?.active)return;
+ stopStream();if(!running||!window.MMAuth.signedIn())return;const state=current();if(!state?.active)return;
  const crypto={XBTUSD:'BTC/USD',ETHUSD:'ETH/USD',SOLUSD:'SOL/USD'}[state.symbol];
  if(!crypto&&(!config?.websocket?.twelve||!session)){status('streamStatus','Closed-candle REST monitoring active. This market’s streaming requires sign-in and provider WebSocket access.');return;}
  const epoch=streamEpoch;delay=1000;streamState=state;
@@ -53,8 +53,8 @@ function startStream(){
 function receive(detail){
  latest=detail;status('backtestResult','Current feed ready: '+detail.rows.length+' closed candles. Run a simulation to include execution assumptions.');
  const key=detail.symbol+'|'+detail.minutes+'|'+detail.rows.at(-1).timestamp;
- if(visualIdentity!==key){visualIdentity=key;setTimeout(()=>{
-  if(latest!==detail)return;try{const model=trainVisual(detail.rows,detail.minutes);const output={...model,weights:undefined};status('visualResult',model.reason+' '+(model.brier===undefined?'':'Test Brier '+model.brier.toFixed(3)+' / baseline '+model.baseline.toFixed(3)+'. ')+(model.up==null?'':'Experimental higher-close estimate '+(model.up*100).toFixed(1)+'%. '));
+ if(visualIdentity!==key){visualIdentity=key;const defer=window.requestIdleCallback||((fn)=>setTimeout(fn,1000));defer(()=>{
+  if(latest!==detail||!window.MMAuth.signedIn())return;try{const model=trainVisual(detail.rows,detail.minutes);const output={...model,weights:undefined};status('visualResult',model.reason+' '+(model.brier===undefined?'':'Test Brier '+model.brier.toFixed(3)+' / baseline '+model.baseline.toFixed(3)+'. ')+(model.up==null?'':'Experimental higher-close estimate '+(model.up*100).toFixed(1)+'%. '));
    localStorage.setItem('making-money-visual-'+detail.symbol+'-'+detail.minutes,JSON.stringify(model));
   }catch(e){status('visualResult',e.message);}
  },0);}
@@ -64,10 +64,10 @@ function formatReport(report){
  const rate=v=>v==null?'No trades':v.toFixed(1)+'%';
  return 'Sample: '+new Date(report.coverage.from).toLocaleDateString()+' – '+new Date(report.coverage.to).toLocaleDateString()+' · '+report.coverage.candles+' candles. '+report.all.trades+' simulated trades · net win rate '+rate(report.all.winRate)+' · net P/L '+report.all.netPnl.toFixed(2)+' · maximum closed-trade drawdown '+report.all.maxDrawdown.toFixed(2)+' (quote currency, one unit). Last 30% holdout: '+report.holdout.trades+' trades, '+rate(report.holdout.winRate)+'. Skipped incomplete/gapped horizons: '+report.skipped+'. '+report.limitations;
 }
-function task(id,fn){el(id).addEventListener('click',async()=>{if(!window.MMAuth.require(id))return;const button=el(id);button.disabled=true;try{await fn();}catch(e){status('serviceFeedback',e.message);}finally{updateControls();if(['runBacktest','trainVisual'].includes(id))button.disabled=false;}});}
+function task(id,fn){el(id).addEventListener('click',async()=>{if(!['subscribePlan','managePlan'].includes(id)&&!window.MMAuth.require(id))return;if(!session){window.MMAuth.open();return;}const button=el(id);button.disabled=true;try{await fn();}catch(e){status('serviceFeedback',e.message);}finally{updateControls();if(['runBacktest','trainVisual'].includes(id))button.disabled=false;}});}
 async function loadHistory(s=selection(),full=false){
  const data=[];let offset=0;
- for(let i=0;i<(full?60:4);i++){const r=await call('history',{...s,offset,recent:true},'GET');data.push(...r.candles);status('archiveProgress','Loading archive: '+data.length+' candles…');if(r.next===null)break;offset=r.next;}
+ for(let i=0;i<(full?60:4);i++){if(!window.MMAuth.signedIn())break;const r=await call('history',{...s,offset,recent:true},'GET');data.push(...r.candles);status('archiveProgress','Loading archive: '+data.length+' candles…');if(r.next===null)break;offset=r.next;}
  data.sort((a,b)=>a.timestamp-b.timestamp);
  if(!data.length){status('archiveProgress','No archived candles yet. Expand history to download provider data.');return;}
  validateCandles(data);if(selection().symbol!==s.symbol||minutes()!==s.minutes)return;
@@ -79,7 +79,7 @@ async function expandHistory(s=selection()){
  const key='mm-import-'+s.symbol+'-'+s.minutes;let count=0;
  try{
   for(let page=0;page<3&&!cancelHistory;page++){
-   if(!session||selection().symbol!==s.symbol||minutes()!==s.minutes)break;
+   if(!session||!window.MMAuth.signedIn()||selection().symbol!==s.symbol||minutes()!==s.minutes)break;
    const before=localStorage.getItem(key);status('archiveProgress','Importing page '+(page+1)+' of 3 for '+s.symbol+'…');
    const r=await call('import',{...s,...(before?{before}:{})});count+=r.saved;
    if(r.before)localStorage.setItem(key,r.before);
@@ -138,10 +138,12 @@ async function boot(){
  el('logout').onclick=async()=>{await auth?.auth.signOut();session=null;accountRole='member';window.MMAuth.setSession(null);updateControls();stopStream();status('accountStatus','Signed out.');};
  try{el('autoHistory').checked=localStorage.getItem('mm-auto-history')!=='false';}catch{}
  el('autoHistory').onchange=()=>{try{localStorage.setItem('mm-auto-history',String(el('autoHistory').checked));}catch{}};
- window.addEventListener('mmprices',e=>receive(e.detail));
+ window.addEventListener('mmprices',e=>{if(window.MMAuth.signedIn())receive(e.detail);});
  window.addEventListener('mmstart',()=>{running=true;latest=null;archiveRows=[];status('backtestResult','Waiting for the selected market’s closed candles.');status('visualResult','Waiting for enough verified chart history.');if(config)startStream();if(session&&config?.history)prepareHistory();});
  window.addEventListener('mmstop',()=>{running=false;latest=null;archiveRows=[];stopStream();status('streamStatus','Stream stopped.');});
  window.addEventListener('pagehide',stopStream);
+ window.addEventListener('mmaccess',()=>{if(!window.MMAuth.signedIn())stopStream();});
+ setInterval(()=>{if(session)refreshAccount();},60000);window.addEventListener('focus',()=>{if(session)refreshAccount();});
  const initial=current();if(initial?.rows?.length)receive(initial);running=!!initial?.active;
  try{
   config=await call('config',null,'GET');
