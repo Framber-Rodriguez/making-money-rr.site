@@ -1,6 +1,6 @@
 import {backtest,trainVisual,validateCandles} from './research.mjs';
 const API='https://making-money-api.vercel.app',el=id=>document.getElementById(id);
-let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='';
+let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false;
 const status=(id,text)=>{if(el(id))el(id).textContent=text;};
 const minutes=()=>({'1 minute':1,'5 minutes':5,'15 minutes':15,'30 minutes':30,'1 hour':60}[el('tf').value]);
 const selection=()=>({symbol:el('pair').value,minutes:minutes()});
@@ -9,10 +9,11 @@ async function call(op,body,method='POST'){
  const response=await fetch(url,{method,headers:{...(body&&method==='POST'?{'Content-Type':'application/json'}:{}),...(session?{Authorization:'Bearer '+session.access_token}:{})},...(body&&method==='POST'?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(65000)});
  const data=await response.json();if(!response.ok)throw Error(data.error||'Service unavailable.');return data;
 }
+window.MMAuthHeaders=()=>session?{Authorization:'Bearer '+session.access_token}:{};
 function current(){return window.MMMonitorState?.();}
 function updateControls(){
- const signed=!!session;el('loginForm').hidden=!config?.auth;el('logout').hidden=!signed;
- for(const [id,key] of [['archivePrices','database'],['importHistory','history'],['loadArchive','database'],['saveVisual','database'],['enablePush','push'],['disablePush','push'],['loadNews','news'],['subscribePlan','billing'],['managePlan','billing']])el(id).disabled=!(signed&&config?.[key]);
+ const signed=!!session;el('loginForm').hidden=signed||!config?.auth;el('logout').hidden=!signed;
+ for(const [id,key] of [['extendHistory','history'],['archivePrices','database'],['importHistory','history'],['loadArchive','database'],['saveVisual','database'],['enablePush','push'],['disablePush','push'],['loadNews','news'],['subscribePlan','billing'],['managePlan','billing']])el(id).disabled=!(signed&&config?.[key]);
 }
 function stopStream(){streamEpoch++;clearTimeout(retry);retry=null;if(socket){socket.onclose=null;socket.close();socket=null;}streamState=null;}
 function startStream(){
@@ -45,7 +46,7 @@ function startStream(){
  connect();
 }
 function receive(detail){
- latest=detail;archiveRows=[];status('backtestResult','Current feed ready: '+detail.rows.length+' closed candles. Run a simulation to include execution assumptions.');
+ latest=detail;status('backtestResult','Current feed ready: '+detail.rows.length+' closed candles. Run a simulation to include execution assumptions.');
  const key=detail.symbol+'|'+detail.minutes+'|'+detail.rows.at(-1).timestamp;
  if(visualIdentity!==key){visualIdentity=key;setTimeout(()=>{
   if(latest!==detail)return;try{const model=trainVisual(detail.rows,detail.minutes);const output={...model,weights:undefined};status('visualResult',model.reason+' '+(model.brier===undefined?'':'Test Brier '+model.brier.toFixed(3)+' / baseline '+model.baseline.toFixed(3)+'. ')+(model.up==null?'':'Experimental higher-close estimate '+(model.up*100).toFixed(1)+'%. '));
@@ -58,7 +59,38 @@ function formatReport(report){
  const rate=v=>v==null?'No trades':v.toFixed(1)+'%';
  return 'Sample: '+new Date(report.coverage.from).toLocaleDateString()+' – '+new Date(report.coverage.to).toLocaleDateString()+' · '+report.coverage.candles+' candles. '+report.all.trades+' simulated trades · net win rate '+rate(report.all.winRate)+' · net P/L '+report.all.netPnl.toFixed(2)+' · maximum closed-trade drawdown '+report.all.maxDrawdown.toFixed(2)+' (quote currency, one unit). Last 30% holdout: '+report.holdout.trades+' trades, '+rate(report.holdout.winRate)+'. Skipped incomplete/gapped horizons: '+report.skipped+'. '+report.limitations;
 }
-function task(id,fn){el(id).addEventListener('click',async()=>{const button=el(id);button.disabled=true;try{await fn();}catch(e){status('serviceFeedback',e.message);}finally{updateControls();if(['runBacktest','trainVisual'].includes(id))button.disabled=false;}});}
+function task(id,fn){el(id).addEventListener('click',async()=>{if(!window.MMAuth.require(id))return;const button=el(id);button.disabled=true;try{await fn();}catch(e){status('serviceFeedback',e.message);}finally{updateControls();if(['runBacktest','trainVisual'].includes(id))button.disabled=false;}});}
+async function loadHistory(s=selection(),full=false){
+ const data=[];let offset=0;
+ for(let i=0;i<(full?60:4);i++){const r=await call('history',{...s,offset,recent:true},'GET');data.push(...r.candles);status('archiveProgress','Loading archive: '+data.length+' candles…');if(r.next===null)break;offset=r.next;}
+ data.sort((a,b)=>a.timestamp-b.timestamp);
+ if(!data.length){status('archiveProgress','No archived candles yet. Expand history to download provider data.');return;}
+ validateCandles(data);if(selection().symbol!==s.symbol||minutes()!==s.minutes)return;
+ archiveRows=data;archiveIdentity=s.symbol+'|'+s.minutes;window.MMsetEvaluationHistory?.(s.symbol,s.minutes,data);
+ status('archiveProgress','Loaded '+data.length+' archived candles · '+new Date(data[0].timestamp).toLocaleDateString()+' – '+new Date(data.at(-1).timestamp).toLocaleDateString()+'. Directional evaluation uses up to 20,000 newest candles; backtesting uses this loaded archive.');
+}
+async function expandHistory(s=selection()){
+ if(historyBusy){status('serviceFeedback','A history import is already running.');return;}historyBusy=true;cancelHistory=false;el('cancelHistory').hidden=false;
+ const key='mm-import-'+s.symbol+'-'+s.minutes;let count=0;
+ try{
+  for(let page=0;page<3&&!cancelHistory;page++){
+   if(!session||selection().symbol!==s.symbol||minutes()!==s.minutes)break;
+   const before=localStorage.getItem(key);status('archiveProgress','Importing page '+(page+1)+' of 3 for '+s.symbol+'…');
+   const r=await call('import',{...s,...(before?{before}:{})});count+=r.saved;
+   if(r.before)localStorage.setItem(key,r.before);
+   status('archiveProgress',count+' candles saved · oldest requested: '+(r.before||r.requestedFrom)+'.');
+   if(r.complete)break;
+  }
+  await loadHistory(s);
+ }finally{historyBusy=false;el('cancelHistory').hidden=true;updateControls();}
+}
+async function prepareHistory(){
+ const s=selection(),key='mm-expanded-'+s.symbol+'-'+s.minutes;
+ try{
+  if(el('autoHistory').checked&&Date.now()-Number(localStorage.getItem(key)||0)>86400000){localStorage.setItem(key,String(Date.now()));await expandHistory(s);}
+  else await loadHistory(s);
+ }catch(e){status('archiveProgress','History expansion paused: '+e.message+' Current feed remains separate. Use Expand history to retry.');}
+}
 async function boot(){
  el('enginePanel').hidden=false;
  task('runBacktest',async()=>{const report=backtest(selectedData(),{minutes:minutes(),costsBps:Number(el('testCosts').value),slippageBps:Number(el('testSlippage').value)});status('backtestResult',formatReport(report));});
@@ -68,12 +100,9 @@ async function boot(){
   const s=selection(),key='mm-import-'+s.symbol+'-'+s.minutes,before=localStorage.getItem(key),r=await call('import',{...s,...(before?{before}:{})});
   if(r.before)localStorage.setItem(key,r.before);status('archiveProgress',r.saved+' candles saved this page · reached '+(r.before||r.requestedFrom)+'. '+(r.complete?'Five-year date boundary reached. Verify missing bars before interpreting results.':'More pages required; click again to continue. Each page uses provider credits.'));
  });
- task('loadArchive',async()=>{
-  const s=selection(),data=[];let offset=0;
-  // Bounded to 300,000 candles: sufficient for five years of 15/30-minute history.
-  for(let i=0;i<60;i++){const r=await call('history',{...s,offset},'GET');data.push(...r.candles);status('archiveProgress','Loaded '+data.length+' archive candles…');if(r.next===null)break;offset=r.next;}
-  validateCandles(data);archiveRows=data;archiveIdentity=s.symbol+'|'+s.minutes;status('archiveProgress','Loaded '+data.length+' archived candles for research. Limited to 300,000 per load; verify the date range. Live prices remain separate.');
- });
+ task('loadArchive',async()=>{await loadHistory(selection(),true);});
+ task('extendHistory',async()=>{await expandHistory();});
+ el('cancelHistory').onclick=()=>{cancelHistory=true;status('archiveProgress','Stopping after the current provider request…');};
  task('saveVisual',async()=>{const r=await call('model',selection());status('serviceFeedback','Provider-derived pixel model stored in your server account. '+r.reason);});
  task('loadNews',async()=>{
   const r=await call('news',selection(),'GET');status('newsResult',(r.meanSentiment==null?'No sentiment score for a matched asset entity.':'Matched-entity sentiment '+r.meanSentiment.toFixed(2)+' on a −1 to +1 scale. ')+r.scope);
@@ -89,22 +118,33 @@ async function boot(){
  });
  task('disablePush',async()=>{await call('push',{...selection(),enabled:false});status('serviceFeedback','Background alerts disabled for this market/timeframe.');});
  for(const op of [['subscribePlan','checkout'],['managePlan','portal']])task(op[0],async()=>{const r=await call(op[1],{});const url=new URL(r.url);if(url.protocol!=='https:'||!['checkout.stripe.com','billing.stripe.com'].includes(url.hostname))throw Error('Invalid billing destination.');window.location.assign(url.href);});
- el('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{if(!auth)throw Error('Accounts not configured.');const {error}=await auth.auth.signInWithOtp({email:el('accountEmail').value,emailOptions:undefined,options:{emailRedirectTo:location.origin+location.pathname}});if(error)throw Error('Sign-in email could not be sent.');status('accountStatus','Check your email for the secure sign-in link.');}catch(e){status('accountStatus',e.message);}});
- el('logout').onclick=async()=>{await auth?.auth.signOut();session=null;updateControls();startStream();status('accountStatus','Signed out.');};
+ async function sendLogin(form,input,feedback){
+  const button=form.querySelector('button[type="submit"]');button.disabled=true;
+  try{if(!auth)throw Error('Secure sign-in is not ready. Please try again shortly.');
+   const {error}=await auth.auth.signInWithOtp({email:input.value.trim(),options:{emailRedirectTo:location.origin+location.pathname}});
+   if(error)throw Error('The sign-in email could not be sent. Check your address or try again later.');
+   status(feedback,'Check your inbox for the secure sign-in link. Gmail addresses are supported.');
+  }catch(e){status(feedback,e.message);}finally{button.disabled=false;}
+ }
+ el('loginForm').addEventListener('submit',e=>{e.preventDefault();sendLogin(e.currentTarget,el('accountEmail'),'accountStatus');});
+ el('modalLoginForm').addEventListener('submit',e=>{e.preventDefault();sendLogin(e.currentTarget,el('modalEmail'),'loginFeedback');});
+ el('logout').onclick=async()=>{await auth?.auth.signOut();session=null;window.MMAuth.setSession(null);updateControls();stopStream();status('accountStatus','Signed out.');};
+ try{el('autoHistory').checked=localStorage.getItem('mm-auto-history')!=='false';}catch{}
+ el('autoHistory').onchange=()=>{try{localStorage.setItem('mm-auto-history',String(el('autoHistory').checked));}catch{}};
  window.addEventListener('mmprices',e=>receive(e.detail));
- window.addEventListener('mmstart',()=>{running=true;latest=null;archiveRows=[];status('backtestResult','Waiting for the selected market’s closed candles.');status('visualResult','Waiting for enough verified chart history.');if(config)startStream();});
+ window.addEventListener('mmstart',()=>{running=true;latest=null;archiveRows=[];status('backtestResult','Waiting for the selected market’s closed candles.');status('visualResult','Waiting for enough verified chart history.');if(config)startStream();if(session&&config?.history)prepareHistory();});
  window.addEventListener('mmstop',()=>{running=false;latest=null;archiveRows=[];stopStream();status('streamStatus','Stream stopped.');});
  window.addEventListener('pagehide',stopStream);
  const initial=current();if(initial?.rows?.length)receive(initial);running=!!initial?.active;
  try{
   config=await call('config',null,'GET');
   status('servicesStatus','Server archive: '+(config.database?'configured':'setup required')+' · background alerts: '+(config.push?'configured':'setup required')+' · news: '+(config.news?'configured':'setup required')+' · subscriptions: '+(config.billing?'configured':'setup required')+'.');
-  status('accountStatus',config.auth?'Sign in to use server features.':'Accounts and server history are awaiting service setup. Live analysis and local research remain available.');
+  status('accountStatus',config.auth?'Sign in to analyze markets and use server features.':'Accounts and server history are awaiting service setup. Live analysis and local research remain available.');
   if(config.auth){const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2.57.4');auth=createClient(config.public.supabaseUrl,config.public.supabaseKey);const {data}=await auth.auth.getSession();session=data.session;
-   auth.auth.onAuthStateChange((_event,next)=>{session=next;updateControls();startStream();status('accountStatus',session?'Signed in: '+session.user.email:'Signed out.');});
+   auth.auth.onAuthStateChange((_event,next)=>{session=next;window.MMAuth.setSession(next);updateControls();startStream();status('accountStatus',session?'Signed in: '+session.user.email:'Signed out.');});
    if(session){const a=await call('account',null,'GET');status('accountStatus',a.email+' · Plan: '+a.status);}
   }
-  updateControls();startStream();
+  window.MMAuth.setSession(session);updateControls();startStream();
  }catch(e){status('servicesStatus','Server feature status unavailable: '+e.message);updateControls();startStream();}
 }
 boot();
