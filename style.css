@@ -21,3 +21,5 @@ body:not(.analysisAccess) .layout{grid-template-columns:1fr}body:not(.analysisAc
 @media(max-width:700px){.navBar{padding:10px 16px}.appMenu .mainNav{width:220px}.layout{display:block}#accessStatus{max-width:65%;font-size:.8rem}.profileDialog{padding:18px}}
 
 body:not(.analysisAccess) #visualReview{display:none!important}
+
+.authModes,.profileFields{display:flex;gap:12px}.authModes button{flex:1}.profileFields label{flex:1;min-width:0}#profileForm{border-top:1px solid #294932;padding-top:18px}#profileForm select{width:100%;padding:12px;margin:8px 0 16px}#profileFeedback,#billingFeedback{color:#79edab;white-space:pre-wrap}.authModes{margin:14px 0}#navCreate{border-color:#22e584}@media(max-width:450px){.profileFields{display:block}}

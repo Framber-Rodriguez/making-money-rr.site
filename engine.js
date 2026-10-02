@@ -1,6 +1,6 @@
 import {backtest,trainVisual,validateCandles} from './research.mjs';
 const API='https://making-money-api.vercel.app',el=id=>document.getElementById(id);
-let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false,accountRole='member';
+let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false,accountRole='member',accountProfile=null;
 const status=(id,text)=>{if(el(id))el(id).textContent=text;};
 const minutes=()=>({'1 minute':1,'5 minutes':5,'15 minutes':15,'30 minutes':30,'1 hour':60}[el('tf').value]);
 const selection=()=>({symbol:el('pair').value,minutes:minutes()});
@@ -12,12 +12,20 @@ async function call(op,body,method='POST'){
 window.MMAuthHeaders=()=>session?{Authorization:'Bearer '+session.access_token}:{};
 async function refreshAccount(){
  const identity=session?.user?.id;if(!identity){accountRole='member';return;}
- try{const a=await call('account',null,'GET');if(session?.user?.id!==identity)return;accountRole=a.role||'member';window.MMAuth.setAccount(a);updateControls();status('accountStatus',a.email+' · '+(a.role==='owner'?'Owner access':('Plan: '+a.status)));}
+ try{const a=await call('account',null,'GET');if(session?.user?.id!==identity)return;accountRole=a.role||'member';accountProfile=a.profile;paintProfile(a);window.MMAuth.setAccount(a);updateControls();status('accountStatus',a.email+' · '+(a.role==='owner'?'Owner access':('Plan: '+a.status)));}
  catch(e){if(session?.user?.id===identity){accountRole='member';status('accountStatus','Signed in. Account access could not be verified: '+e.message);}}
+}
+function paintProfile(account){
+ el('profileForm').hidden=!session;
+ const p=account.profile||{};el('profileFormTitle').textContent=p.complete?'Account details':'Complete your account';
+ if(!el('profileForm').contains(document.activeElement)){
+  el('firstName').value=p.first_name||'';el('lastName').value=p.last_name||'';el('alertEmail').value=p.alert_email||account.email||'';
+  el('profileTimezone').value=p.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+ }
 }
 function current(){return window.MMMonitorState?.();}
 function updateControls(){
- const signed=!!session;el('loginForm').hidden=signed||!config?.auth;el('logout').hidden=!signed;el('subscribePlan').hidden=el('managePlan').hidden=accountRole==='owner';
+ const signed=!!session;el('profileForm').hidden=!signed;el('loginForm').hidden=signed||!config?.auth;el('logout').hidden=!signed;el('checkBilling').hidden=!(signed&&accountRole==='owner');el('subscribePlan').hidden=el('managePlan').hidden=accountRole==='owner';
  for(const [id,key] of [['extendHistory','history'],['archivePrices','database'],['importHistory','history'],['loadArchive','database'],['saveVisual','database'],['enablePush','push'],['disablePush','push'],['loadNews','news'],['subscribePlan','billing'],['managePlan','billing']])el(id).disabled=!(signed&&config?.[key]&&(['subscribePlan','managePlan'].includes(id)||window.MMAuth.signedIn()));
 }
 function stopStream(){streamEpoch++;clearTimeout(retry);retry=null;if(socket){socket.onclose=null;socket.close();socket=null;}streamState=null;}
@@ -64,7 +72,7 @@ function formatReport(report){
  const rate=v=>v==null?'No trades':v.toFixed(1)+'%';
  return 'Sample: '+new Date(report.coverage.from).toLocaleDateString()+' – '+new Date(report.coverage.to).toLocaleDateString()+' · '+report.coverage.candles+' candles. '+report.all.trades+' simulated trades · net win rate '+rate(report.all.winRate)+' · net P/L '+report.all.netPnl.toFixed(2)+' · maximum closed-trade drawdown '+report.all.maxDrawdown.toFixed(2)+' (quote currency, one unit). Last 30% holdout: '+report.holdout.trades+' trades, '+rate(report.holdout.winRate)+'. Skipped incomplete/gapped horizons: '+report.skipped+'. '+report.limitations;
 }
-function task(id,fn){el(id).addEventListener('click',async()=>{if(!['subscribePlan','managePlan'].includes(id)&&!window.MMAuth.require(id))return;if(!session){window.MMAuth.open();return;}const button=el(id);button.disabled=true;try{await fn();}catch(e){status('serviceFeedback',e.message);}finally{updateControls();if(['runBacktest','trainVisual'].includes(id))button.disabled=false;}});}
+function task(id,fn){el(id).addEventListener('click',async()=>{if(!['subscribePlan','managePlan'].includes(id)&&!window.MMAuth.require(id))return;if(!session){window.MMAuth.open();return;}const button=el(id);button.disabled=true;try{await fn();}catch(e){status(['subscribePlan','managePlan'].includes(id)?'billingFeedback':'serviceFeedback',e.message);}finally{updateControls();if(['runBacktest','trainVisual'].includes(id))button.disabled=false;}});}
 async function loadHistory(s=selection(),full=false){
  const data=[];let offset=0;
  for(let i=0;i<(full?60:4);i++){if(!window.MMAuth.signedIn())break;const r=await call('history',{...s,offset,recent:true},'GET');data.push(...r.candles);status('archiveProgress','Loading archive: '+data.length+' candles…');if(r.next===null)break;offset=r.next;}
@@ -122,19 +130,23 @@ async function boot(){
   await call('push',{...selection(),subscription:subscription.toJSON(),enabled:true});status('serviceFeedback','Background alerts enabled for the selected market/timeframe. Delivery is best effort, checked on the server schedule.');
  });
  task('disablePush',async()=>{await call('push',{...selection(),enabled:false});status('serviceFeedback','Background alerts disabled for this market/timeframe.');});
- for(const op of [['subscribePlan','checkout'],['managePlan','portal']])task(op[0],async()=>{const r=await call(op[1],{});const url=new URL(r.url);if(url.protocol!=='https:'||!['checkout.stripe.com','billing.stripe.com'].includes(url.hostname))throw Error('Invalid billing destination.');window.location.assign(url.href);});
+ for(const op of [['subscribePlan','checkout'],['managePlan','portal']])task(op[0],async()=>{status('billingFeedback','Opening secure billing…');const r=await call(op[1],{});const url=new URL(r.url);if(url.protocol!=='https:'||!['checkout.stripe.com','billing.stripe.com'].includes(url.hostname))throw Error('Invalid billing destination.');window.location.assign(url.href);});
+ el('checkBilling').onclick=async()=>{el('checkBilling').disabled=true;status('billingFeedback','Checking production payment setup…');try{const r=await call('billing-status',null,'GET');status('billingFeedback',r.message);}catch(e){status('billingFeedback',e.message);}finally{el('checkBilling').disabled=false;}};
  async function sendLogin(form,input,feedback){
   const button=form.querySelector('button[type="submit"]');button.disabled=true;
   try{if(!auth)throw Error('Secure sign-in is not ready. Please try again shortly.');
    const value=input.value.trim();if(!value.includes('@')){const r=await call('owner-login',{username:value});status(feedback,r.message);return;}
    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))throw Error('Enter a valid email address or your assigned username.');
-   const {error}=await auth.auth.signInWithOtp({email:value,options:{emailRedirectTo:location.origin+location.pathname}});
-   if(error)throw Error('The sign-in email could not be sent. Check your address or try again later.');
-   status(feedback,'Check your inbox for the secure sign-in link. Gmail addresses are supported.');
+   const mode=form.id==='modalLoginForm'?(window.MMLoginMode||'register'):'login';const {error}=await auth.auth.signInWithOtp({email:value,options:{shouldCreateUser:mode==='register',emailRedirectTo:location.origin+location.pathname}});
+   if(error){const code=error.code||'';throw Error(code==='over_email_send_rate_limit'||error.status===429?'Too many email requests. Wait a few minutes before requesting a fresh link.':code==='email_address_not_authorized'?'Email delivery is restricted by the authentication provider. The owner must configure production email delivery.':code==='otp_disabled'||code==='user_not_found'?'Use Create account first if this email is not registered.':'Could not send the secure link ('+(code||error.status||'email service')+'). Check your email or retry in a minute.');}
+   status(feedback,'Check your inbox and spam folder. Open the newest secure link once. New accounts complete their details after returning here.');
   }catch(e){status(feedback,e.message);}finally{button.disabled=false;}
  }
  el('loginForm').addEventListener('submit',e=>{e.preventDefault();sendLogin(e.currentTarget,el('accountEmail'),'accountStatus');});
  el('modalLoginForm').addEventListener('submit',e=>{e.preventDefault();sendLogin(e.currentTarget,el('modalEmail'),'loginFeedback');});
+ const zones=Intl.supportedValuesOf?Intl.supportedValuesOf('timeZone'):['UTC'];const localZone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+ el('profileTimezone').replaceChildren(...[...new Set(['UTC',localZone,...zones])].map(zone=>{const o=document.createElement('option');o.value=o.textContent=zone;return o;}));
+ el('profileForm').addEventListener('submit',async e=>{e.preventDefault();const button=el('saveProfile');button.disabled=true;status('profileFeedback','Saving…');try{await call('profile',{first_name:el('firstName').value,last_name:el('lastName').value,alert_email:el('alertEmail').value,timezone:el('profileTimezone').value});await refreshAccount();status('profileFeedback','Account details saved.');}catch(err){status('profileFeedback',err.message);}finally{button.disabled=false;}});
  el('logout').onclick=async()=>{await auth?.auth.signOut();session=null;accountRole='member';window.MMAuth.setSession(null);updateControls();stopStream();status('accountStatus','Signed out.');};
  try{el('autoHistory').checked=localStorage.getItem('mm-auto-history')!=='false';}catch{}
  el('autoHistory').onchange=()=>{try{localStorage.setItem('mm-auto-history',String(el('autoHistory').checked));}catch{}};
@@ -150,7 +162,7 @@ async function boot(){
   status('billingAvailability',config.billing?'Sign in to access secure subscription checkout.':'Subscription checkout is awaiting payment-service setup. No payment can be taken yet.');
   status('servicesStatus','Server archive: '+(config.database?'configured':'setup required')+' · background alerts: '+(config.push?'configured':'setup required')+' · news: '+(config.news?'configured':'setup required')+' · subscriptions: '+(config.billing?'configured':'setup required')+'.');
   status('accountStatus',config.auth?'Sign in to analyze markets and use server features.':'Accounts and server history are awaiting service setup. Live analysis and local research remain available.');
-  if(config.auth){const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2.57.4');auth=createClient(config.public.supabaseUrl,config.public.supabaseKey);const {data}=await auth.auth.getSession();session=data.session;
+  if(config.auth){const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2.57.4');auth=createClient(config.public.supabaseUrl,config.public.supabaseKey);const {data,error:sessionError}=await auth.auth.getSession();session=data.session;if(sessionError){window.MMAuth.open('','login');status('loginFeedback','This sign-in link is invalid or expired. Request a new one.');}
    auth.auth.onAuthStateChange((_event,next)=>{session=next;if(!next)accountRole='member';window.MMAuth.setSession(next);updateControls();startStream();status('accountStatus',session?'Signed in: '+session.user.email:'Signed out.');if(next)setTimeout(refreshAccount,0);});
    if(session)await refreshAccount();
   }
