@@ -1,4 +1,5 @@
 import {backtest,trainVisual,validateCandles} from './research.mjs';
+import {emailCredentials} from './account-auth.mjs';
 const API='https://making-money-api.vercel.app',el=id=>document.getElementById(id);
 let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false,accountRole='member',accountProfile=null;
 const status=(id,text)=>{if(el(id))el(id).textContent=text;};
@@ -135,17 +136,18 @@ async function boot(){
  async function sendLogin(form,input,feedback){
   const button=form.querySelector('button[type="submit"]');button.disabled=true;
   try{if(!auth)throw Error('Secure sign-in is not ready. Please try again shortly.');
-   const value=input.value.trim();if(!value.includes('@')){const r=await call('owner-login',{username:value});status(feedback,r.message);return;}
+   const value=input.value.trim();if(form.id!=='registerForm'&&!value.includes('@')){const r=await call('owner-login',{username:value});status(feedback,r.message);return;}
    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))throw Error('Enter a valid email address or your assigned username.');
-   const mode=form.id==='modalLoginForm'?(window.MMLoginMode||'register'):'login';const {error}=await auth.auth.signInWithOtp({email:value,options:{shouldCreateUser:mode==='register',emailRedirectTo:location.origin+location.pathname}});
+   const registering=form.id==='registerForm';const fields=registering?{first_name:el('registerFirstName').value,last_name:el('registerLastName').value,alert_email:el('registerAlertEmail').value,timezone:el('registerTimezone').value}:null;const {error}=await auth.auth.signInWithOtp(emailCredentials(value,fields,location.origin+location.pathname));
    if(error){const code=error.code||'';throw Error(code==='over_email_send_rate_limit'||error.status===429?'Too many email requests. Wait a few minutes before requesting a fresh link.':code==='email_address_not_authorized'?'Email delivery is restricted by the authentication provider. The owner must configure production email delivery.':code==='otp_disabled'||code==='user_not_found'?'Use Create account first if this email is not registered.':'Could not send the secure link ('+(code||error.status||'email service')+'). Check your email or retry in a minute.');}
-   status(feedback,'Check your inbox and spam folder. Open the newest secure link once. New accounts complete their details after returning here.');
+   status(feedback,registering?'Check your inbox and spam folder. Confirm your email with the newest link to activate your account. Your details will appear in My profile.':'Check your inbox and spam folder. Open the newest sign-in link once to enter your account.');
   }catch(e){status(feedback,e.message);}finally{button.disabled=false;}
  }
+ el('registerForm').addEventListener('submit',e=>{e.preventDefault();sendLogin(e.currentTarget,el('registerEmail'),'registerFeedback');});
  el('loginForm').addEventListener('submit',e=>{e.preventDefault();sendLogin(e.currentTarget,el('accountEmail'),'accountStatus');});
  el('modalLoginForm').addEventListener('submit',e=>{e.preventDefault();sendLogin(e.currentTarget,el('modalEmail'),'loginFeedback');});
  const zones=Intl.supportedValuesOf?Intl.supportedValuesOf('timeZone'):['UTC'];const localZone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
- el('profileTimezone').replaceChildren(...[...new Set(['UTC',localZone,...zones])].map(zone=>{const o=document.createElement('option');o.value=o.textContent=zone;return o;}));
+ for(const id of ['profileTimezone','registerTimezone']){el(id).replaceChildren(...[...new Set(['UTC',localZone,...zones])].map(zone=>{const o=document.createElement('option');o.value=o.textContent=zone;return o;}));el(id).value=localZone;}
  el('profileForm').addEventListener('submit',async e=>{e.preventDefault();const button=el('saveProfile');button.disabled=true;status('profileFeedback','Saving…');try{await call('profile',{first_name:el('firstName').value,last_name:el('lastName').value,alert_email:el('alertEmail').value,timezone:el('profileTimezone').value});await refreshAccount();status('profileFeedback','Account details saved.');}catch(err){status('profileFeedback',err.message);}finally{button.disabled=false;}});
  el('logout').onclick=async()=>{await auth?.auth.signOut();session=null;accountRole='member';window.MMAuth.setSession(null);updateControls();stopStream();status('accountStatus','Signed out.');};
  try{el('autoHistory').checked=localStorage.getItem('mm-auto-history')!=='false';}catch{}

@@ -3,7 +3,11 @@
  const $=id=>document.getElementById(id),allowed=()=>signed&&!!access?.allowed&&(!expires||performance.now()<expires);
  const dialog=()=>$('loginDialog');
  function profile(){const d=$('profileDialog');if(!d.open)d.showModal();$('appMenu').open=false;}
- function open(action='',mode='register'){window.MMLoginMode=mode;$('loginTitle').textContent=mode==='register'?'Create your account':'Sign in / Login';$('loginDescription').textContent=mode==='register'?'Enter your email. After verifying it, complete your name and account details.':'Use the email you registered with. We will send a secure link to enter your account.';pending=action;try{sessionStorage.setItem('mm-pending-analysis',action);}catch{}if(!dialog().open)dialog().showModal();$('loginFeedback').textContent=ready?'':'Connecting secure sign-in…';$('appMenu').open=false;}
+ function open(action='',mode='register'){
+  window.MMLoginMode=mode;pending=action;try{sessionStorage.setItem('mm-pending-analysis',action);}catch{}
+  const target=mode==='register'?$('registerDialog'):dialog(),other=mode==='register'?dialog():$('registerDialog');
+  other.close();if(!target.open)target.showModal();$(mode==='register'?'registerFeedback':'loginFeedback').textContent=ready?'':'Connecting secure sign-in…';$('appMenu').open=false;
+ }
  function paint(){
   const active=allowed(),owner=signed&&access?.role==='owner';document.body.classList.toggle('analysisAccess',active);
   if(lastAllowed&&!active)window.MMstopAnalysis?.();lastAllowed=active;
@@ -27,12 +31,12 @@
   },
   setSession(next){const changed=signed!==!!next;ready=true;signed=!!next;if(changed||!signed){access=null;expires=0;}
    $('profileEmail').textContent=next?.user?.email||'Sign in to access analysis and your server archive.';$('navLogin').textContent=signed?'My profile':'Sign in / Login';$('navCreate').hidden=signed;
-   if(signed){dialog()?.close();try{pending ||= sessionStorage.getItem('mm-pending-analysis')||'';}catch{}}else{$('profileUsername').hidden=true;window.MMstopAnalysis?.();}paint();window.dispatchEvent(new Event('mmauth'));
+   if(signed){dialog()?.close();$('registerDialog').close();try{pending ||= sessionStorage.getItem('mm-pending-analysis')||'';}catch{}}else{$('profileUsername').hidden=true;window.MMstopAnalysis?.();}paint();window.dispatchEvent(new Event('mmauth'));
   }
  };
  document.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&['live','analyzeMarket','aiAnalyze','runBacktest','trainVisual','exportHistory'].includes(b.id)&&!allowed()){e.preventDefault();e.stopImmediatePropagation();window.MMAuth.require(b.id==='live'?'monitor':b.id==='analyzeMarket'?'analyze':b.id);}},true);
  document.addEventListener('DOMContentLoaded',()=>{
-  $('navLogin').onclick=()=>signed?profile():open('','login');$('navCreate').onclick=()=>open('','register');$('chooseRegister').onclick=()=>open(pending,'register');$('chooseLogin').onclick=()=>open(pending,'login');$('closeProfile').onclick=()=>$('profileDialog').close();$('closeLogin').onclick=()=>dialog().close();$('accessAction').onclick=()=>signed?profile():open('monitor');
+  $('navLogin').onclick=()=>signed?profile():open('','login');$('navCreate').onclick=()=>open('','register');$('chooseRegister').onclick=()=>open(pending,'register');$('chooseLogin').onclick=()=>open(pending,'login');$('closeProfile').onclick=()=>$('profileDialog').close();$('closeLogin').onclick=()=>dialog().close();$('closeRegister').onclick=()=>$('registerDialog').close();$('accessAction').onclick=()=>signed?profile():open('monitor');
   document.querySelectorAll('.mainNav a').forEach(link=>link.addEventListener('click',e=>{$('appMenu').open=false;const target=document.querySelector(link.getAttribute('href'));if(target?.closest('[data-benefit]')&&!allowed()){e.preventDefault();window.MMAuth.require('research');return;}if(target?.tagName==='DETAILS')target.open=true;}));paint();setInterval(()=>{if(signed&&access?.trialEndsAt)paint();},1000);
  });
 })();
