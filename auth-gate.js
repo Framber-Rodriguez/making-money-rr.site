@@ -32,7 +32,7 @@
  };
  document.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&['live','analyzeMarket','aiAnalyze','runBacktest','trainVisual','exportHistory'].includes(b.id)&&!allowed()){e.preventDefault();e.stopImmediatePropagation();window.MMAuth.require(b.id==='live'?'monitor':b.id==='analyzeMarket'?'analyze':b.id);}},true);
  document.addEventListener('DOMContentLoaded',()=>{
-  $('navLogin').onclick=()=>signed?profile():open('','login');$('navCreate').onclick=()=>open('','register');$('chooseRegister').onclick=()=>open(pending,'register');$('chooseLogin').onclick=()=>open(pending,'login');$('menuProfile').onclick=profile;$('closeProfile').onclick=()=>$('profileDialog').close();$('closeLogin').onclick=()=>dialog().close();$('accessAction').onclick=()=>signed?profile():open('monitor');
+  $('navLogin').onclick=()=>signed?profile():open('','login');$('navCreate').onclick=()=>open('','register');$('chooseRegister').onclick=()=>open(pending,'register');$('chooseLogin').onclick=()=>open(pending,'login');$('closeProfile').onclick=()=>$('profileDialog').close();$('closeLogin').onclick=()=>dialog().close();$('accessAction').onclick=()=>signed?profile():open('monitor');
   document.querySelectorAll('.mainNav a').forEach(link=>link.addEventListener('click',e=>{$('appMenu').open=false;const target=document.querySelector(link.getAttribute('href'));if(target?.closest('[data-benefit]')&&!allowed()){e.preventDefault();window.MMAuth.require('research');return;}if(target?.tagName==='DETAILS')target.open=true;}));paint();setInterval(()=>{if(signed&&access?.trialEndsAt)paint();},1000);
  });
 })();
