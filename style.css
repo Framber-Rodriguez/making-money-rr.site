@@ -2,3 +2,6 @@
 
 .livecontrols{background:#0b1523;padding:18px;margin-bottom:18px}.livecontrols h3{margin-top:0}#chart{width:100%;height:210px;margin-top:18px}input[type=checkbox]{width:22px;height:22px}
 .languageControl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:440px}.languageControl label{flex:none;color:#d2dfef}.languageControl select{width:190px;margin:0}.languageControl span{font-size:14px;color:#e3bf77;width:100%}#forecastDirection{border-left:3px solid #3be5af;padding-left:14px;font-weight:600}#analyzeMarket{width:100%}a{color:#72c6ff}header{gap:20px;flex-wrap:wrap}option{font-size:14px}
+
+
+#watchlist{display:flex;gap:10px;flex-wrap:wrap}#watchlist>div{display:flex;gap:3px}#watchlist button{padding:9px 12px}#analysisChart{width:100%;height:350px;margin-top:16px}#observedTrend{color:#72c6ff}#riskNotice{border-color:#c89f43}#riskNotice[hidden],#analysisChart[hidden]{display:none}.optionalTools{margin-top:20px}.optionalTools>summary{padding:15px;background:#162438;border-radius:8px;margin-bottom:15px}.bottom{grid-template-columns:repeat(2,1fr)}.watchlistPanel h3{margin:8px 0}.watchlistPanel .toolbar{align-items:center;justify-content:space-between}#exportHistory{margin-top:12px}@media(max-width:850px){.bottom{grid-template-columns:1fr}#watchlist{flex-direction:column}#watchlist>div button:first-child{flex:1}}
