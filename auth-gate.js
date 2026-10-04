@@ -6,7 +6,7 @@
  function open(action='',mode='register'){
   window.MMLoginMode=mode;pending=action;try{sessionStorage.setItem('mm-pending-analysis',action);}catch{}
   const target=mode==='register'?$('registerDialog'):dialog(),other=mode==='register'?dialog():$('registerDialog');
-  other.close();if(!target.open)target.showModal();$(mode==='register'?'registerFeedback':'loginFeedback').textContent=ready?'':'Connecting secure sign-in…';$('appMenu').open=false;
+  other.close();if(!target.open)target.showModal();if(mode==='register')window.dispatchEvent(new Event('mmregister'));$(mode==='register'?'registerFeedback':'loginFeedback').textContent=ready?'':'Connecting secure sign-in…';$('appMenu').open=false;
  }
  function paint(){
   const active=allowed(),owner=signed&&access?.role==='owner';document.body.classList.toggle('analysisAccess',active);

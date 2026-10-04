@@ -15,7 +15,11 @@ const HCAPTCHA_SITE_KEY = 'b0ee46ec-bb68-4bdc-8094-6f60a684297e';
   }
   const script = document.createElement('script');
   script.src = 'https://js.hcaptcha.com/1/api.js?render=explicit';
-  script.onload = () => { widget = window.hcaptcha.render(panel.querySelector('#aiChallenge'), {
+  let registrationToken='',registrationWidget;
+  window.MMRegisterCaptcha={token:()=>registrationToken,reset:()=>{registrationToken='';if(registrationWidget!==undefined)window.hcaptcha?.reset(registrationWidget);}};
+  function renderRegistration(){if(registrationWidget!==undefined||!window.hcaptcha||!document.getElementById('registerDialog').open)return;registrationWidget=window.hcaptcha.render(document.getElementById('registerChallenge'),{sitekey:HCAPTCHA_SITE_KEY,callback:v=>{registrationToken=v;},'expired-callback':()=>{registrationToken='';},'error-callback':()=>{registrationToken='';}});}
+  window.addEventListener('mmregister',renderRegistration);
+  script.onload = () => { renderRegistration();widget = window.hcaptcha.render(panel.querySelector('#aiChallenge'), {
     sitekey: HCAPTCHA_SITE_KEY,
     callback: value => { token = value; button.disabled = false; },
     'expired-callback': () => { token = ''; button.disabled = true; },
@@ -52,3 +56,4 @@ const HCAPTCHA_SITE_KEY = 'b0ee46ec-bb68-4bdc-8094-6f60a684297e';
     finally { token = ''; window.hcaptcha.reset(widget); }
   };
 })();
+
