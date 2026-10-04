@@ -1,5 +1,5 @@
 import {backtest,trainVisual,validateCandles} from './research.mjs';
-import {emailCredentials} from './account-auth.mjs';
+import {emailCredentials} from './account-auth.mjs?v=2';
 const API='https://making-money-api.vercel.app',el=id=>document.getElementById(id);
 let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false,accountRole='member',accountProfile=null;
 const status=(id,text)=>{const node=el(id);if(!node)return;node.textContent=text;if(id==='registerFeedback'&&text){node.scrollIntoView({block:'center',behavior:'smooth'});node.focus({preventScroll:true});}};

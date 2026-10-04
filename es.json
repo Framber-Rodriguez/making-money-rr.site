@@ -198,6 +198,11 @@
   "Your account is pending email confirmation. Use Sign in / Login to request a new link.": "Tu cuenta está pendiente de confirmar el correo. Usa Iniciar sesión / Login para solicitar un enlace nuevo.",
   "Registration verification is not configured.": "La verificación de registro aún no está configurada.",
   "Your account could not be created. Please try again later.": "No se pudo crear tu cuenta. Inténtalo de nuevo más tarde.",
-  "Check your inbox and spam folder. Confirm your email with the newest link to activate your account. Your details will appear in My profile.": "Revisa tu bandeja de entrada y correo no deseado. Confirma tu correo con el enlace más reciente para activar tu cuenta. Tus datos aparecerán en Mi perfil."
+  "Check your inbox and spam folder. Confirm your email with the newest link to activate your account. Your details will appear in My profile.": "Revisa tu bandeja de entrada y correo no deseado. Confirma tu correo con el enlace más reciente para activar tu cuenta. Tus datos aparecerán en Mi perfil.",
+  "Alert email (optional)": "Correo de alertas (opcional)",
+  "Leave blank to use your sign-in email": "Déjalo vacío para usar el correo de tu cuenta",
+  "If you leave alert email blank, we use your sign-in email. Email alerts are not active yet.": "Si dejas el correo de alertas vacío, usaremos el correo de tu cuenta. Las alertas por correo aún no están activas.",
+  "Account verification is misconfigured. The owner must check that the production hCaptcha secret matches this Site Key and redeploy.": "La verificación de cuentas está mal configurada. El propietario debe comprobar que el secreto de hCaptcha en producción corresponde a esta Site Key y volver a publicar.",
+  "Verification expired or was already used. Complete a new challenge and submit again.": "La verificación venció o ya se usó. Completa una nueva verificación y vuelve a enviar.",
+  "Verification could not be confirmed. Complete a new challenge and submit again.": "No se pudo confirmar la verificación. Completa una nueva verificación y vuelve a enviar."
 }
-
