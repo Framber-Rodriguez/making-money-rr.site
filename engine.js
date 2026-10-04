@@ -2,7 +2,7 @@ import {backtest,trainVisual,validateCandles} from './research.mjs';
 import {emailCredentials} from './account-auth.mjs';
 const API='https://making-money-api.vercel.app',el=id=>document.getElementById(id);
 let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false,accountRole='member',accountProfile=null;
-const status=(id,text)=>{if(el(id))el(id).textContent=text;};
+const status=(id,text)=>{const node=el(id);if(!node)return;node.textContent=text;if(id==='registerFeedback'&&text){node.scrollIntoView({block:'center',behavior:'smooth'});node.focus({preventScroll:true});}};
 const minutes=()=>({'1 minute':1,'5 minutes':5,'15 minutes':15,'30 minutes':30,'1 hour':60}[el('tf').value]);
 const selection=()=>({symbol:el('pair').value,minutes:minutes()});
 async function call(op,body,method='POST'){
