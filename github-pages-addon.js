@@ -1,6 +1,6 @@
 // Copiar a la raíz de GitHub Pages. Solo valores públicos.
 const MAKING_MONEY_API = 'https://making-money-api.vercel.app';
-const HCAPTCHA_SITE_KEY = 'b9e64c2c-6c4a-479c-8616-5392b78a9f42';
+const HCAPTCHA_SITE_KEY = '6126b578-0202-436e-9f30-d0c25c7209d8';
 
 (() => {
   const panel = document.createElement('section');
