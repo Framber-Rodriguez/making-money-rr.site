@@ -5,7 +5,7 @@
   const data=input.slice(-20000),last=data.at(-1);if(!last||data.length<60)return {available:false,reason:'At least 60 verified closed candles are needed.'};
   const diffs=data.slice(1).map((r,i)=>r.timestamp-data[i].timestamp).sort((a,b)=>a-b),step=diffs[Math.floor(diffs.length/2)],h=minutes*60000/step;
   if(![5,10,30].includes(minutes)||!Number.isInteger(h)||h<1)return {available:false,reason:'Use 1- or 5-minute candles for 5/10-minute forecasts. Larger candles cannot resolve the requested future close.'};
-  const key=[minutes,data.length,data[0].timestamp,last.timestamp,last.close,data.reduce((s,r)=>s+r.close+r.high+r.low+r.open+(r.volume||0),0)].join('|');if(cache.has(key))return cache.get(key);
+  const key=[minutes,data.length,data[0].timestamp,last.timestamp,last.close,data.reduce((s,r)=>s+r.timestamp+r.close+r.high+r.low+r.open+(r.volume||0),0)].join('|');if(cache.has(key))return cache.get(key);
   const features=new Map(),gaps=[0];for(let i=1;i<data.length;i++)gaps[i]=gaps[i-1]+(data[i].timestamp-data[i-1].timestamp===step?0:1);
   if(gaps.at(-1)!==gaps[data.length-technical.LOOKBACK])return {available:false,reason:'Recent price history contains gaps. Refresh a continuous sequence of closed candles.'};
   const contexts=technical.build(data),width=12;const feature=i=>contexts[i];
