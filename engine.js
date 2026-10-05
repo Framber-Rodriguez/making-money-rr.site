@@ -1,6 +1,7 @@
 import {backtest,trainVisual,validateCandles} from './research.mjs';
 import {emailCredentials} from './account-auth.mjs?v=2';
 const API='https://making-money-api.vercel.app',el=id=>document.getElementById(id);
+let learningBusy=false,learningAt=0,learningIdentity='';
 let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false,accountRole='member',accountProfile=null;
 const status=(id,text)=>{const node=el(id);if(!node)return;node.textContent=text;if(id==='registerFeedback'&&text){node.scrollIntoView({block:'center',behavior:'smooth'});node.focus({preventScroll:true});}};
 const minutes=()=>({'1 minute':1,'5 minutes':5,'15 minutes':15,'30 minutes':30,'1 hour':60}[el('tf').value]);
@@ -60,13 +61,21 @@ function startStream(){
  connect();
 }
 function receive(detail){
- latest=detail;status('backtestResult','Current feed ready: '+detail.rows.length+' closed candles. Run a simulation to include execution assumptions.');
+ latest=detail;updateServerLearning(detail);status('backtestResult','Current feed ready: '+detail.rows.length+' closed candles. Run a simulation to include execution assumptions.');
  const key=detail.symbol+'|'+detail.minutes+'|'+detail.rows.at(-1).timestamp;
  if(visualIdentity!==key){visualIdentity=key;const defer=window.requestIdleCallback||((fn)=>setTimeout(fn,1000));defer(()=>{
   if(latest!==detail||!window.MMAuth.signedIn())return;try{const model=trainVisual(detail.rows,detail.minutes);const output={...model,weights:undefined};status('visualResult',model.reason+' '+(model.brier===undefined?'':'Test Brier '+model.brier.toFixed(3)+' / baseline '+model.baseline.toFixed(3)+'. ')+(model.up==null?'':'Experimental higher-close estimate '+(model.up*100).toFixed(1)+'%. '));
    localStorage.setItem('making-money-visual-'+detail.symbol+'-'+detail.minutes,JSON.stringify(model));
   }catch(e){status('visualResult',e.message);}
  },0);}
+}
+async function updateServerLearning(detail){
+ const identity=detail.symbol+'|'+detail.minutes;
+ if(learningBusy||!config?.database||!session||!window.MMAuth.signedIn()||(learningIdentity===identity&&Date.now()-learningAt<300000))return;
+ learningBusy=true;learningIdentity=identity;learningAt=Date.now();const userId=session.user.id;
+ try{const report=await call('learning',{symbol:detail.symbol,minutes:detail.minutes});
+  if(session?.user?.id===userId&&latest?.symbol===detail.symbol&&latest?.minutes===detail.minutes&&window.MMAuth.signedIn())window.dispatchEvent(new CustomEvent('mmlearning',{detail:report}));
+ }catch(e){status('learningJournal','Server learning paused: '+e.message);}finally{learningBusy=false;}
 }
 function selectedData(){const s=selection();if(archiveRows.length&&archiveIdentity===s.symbol+'|'+s.minutes)return archiveRows;if(!latest||latest.symbol!==s.symbol||latest.minutes!==s.minutes)throw Error('Wait for verified prices for this market/timeframe.');return latest.rows;}
 function formatReport(report){
@@ -162,7 +171,7 @@ async function boot(){
  try{
   config=await call('config',null,'GET');
   status('billingAvailability',config.billing?'Sign in to access secure subscription checkout.':'Subscription checkout is awaiting payment-service setup. No payment can be taken yet.');
-  status('servicesStatus','Server archive: '+(config.database?'configured':'setup required')+' · background alerts: '+(config.push?'configured':'setup required')+' · news: '+(config.news?'configured':'setup required')+' · subscriptions: '+(config.billing?'configured':'setup required')+'.');
+  status('servicesStatus','Daily learning schedule: '+(config.learningSchedule?'configured; delivery unverified':'requires CRON_SECRET')+' · Server archive: '+(config.database?'configured':'setup required')+' · background alerts: '+(config.push?'configured':'setup required')+' · news: '+(config.news?'configured':'setup required')+' · subscriptions: '+(config.billing?'configured':'setup required')+'.');
   status('accountStatus',config.auth?'Sign in to analyze markets and use server features.':'Accounts and server history are awaiting service setup. Live analysis and local research remain available.');
   if(config.auth){const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2.57.4');auth=createClient(config.public.supabaseUrl,config.public.supabaseKey);const {data,error:sessionError}=await auth.auth.getSession();session=data.session;if(sessionError){window.MMAuth.open('','login');status('loginFeedback','This sign-in link is invalid or expired. Request a new one.');}
    auth.auth.onAuthStateChange((_event,next)=>{session=next;if(!next)accountRole='member';window.MMAuth.setSession(next);updateControls();startStream();status('accountStatus',session?'Signed in: '+session.user.email:'Signed out.');if(next)setTimeout(refreshAccount,0);});

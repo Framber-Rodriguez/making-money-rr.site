@@ -1,0 +1,6 @@
+const test=require('node:test'),assert=require('node:assert/strict'),t=require('./technical.js'),q=require('./daily-quote.js');
+const rows=(n=130)=>Array.from({length:n},(_,i)=>({timestamp:1700000000000+i*300000,open:100+i*.1,close:100.05+i*.1,high:100.2+i*.1,low:99.8+i*.1}));
+test('indicators and pattern features never use future candles',()=>{const r=rows(),a=t.build(r.slice(0,80)).at(-1);r[90]={...r[90],high:9000,close:8999};assert.deepEqual(t.build(r)[79],a);assert.ok(a.rsi>99);assert.equal(a.x.length,12);assert.equal(a.volumeRatio,null);});
+test('engulfing and doji follow OHLC thresholds',()=>{const r=rows(80);r[78]={...r[78],open:110,close:108,high:111,low:107};r[79]={...r[79],open:107.8,close:110.2,high:110.4,low:107.7};assert.ok(t.analyze(r).patterns.some(p=>p.name==='Bullish engulfing'));r[79]={...r[79],open:110,close:110.01,high:111,low:109};assert.ok(t.analyze(r).patterns.some(p=>p.name==='Doji'));});
+test('technical panel pauses on missing bars',()=>{const r=rows();r[100].timestamp+=1;assert.equal(t.analyze(r).available,false);});
+test('daily phrases are stable within a local day and vary for a full year',()=>{assert.equal(q.phrase(new Date(2026,2,10,0)),q.phrase(new Date(2026,2,10,23)));const unique=new Set(Array.from({length:365},(_,i)=>q.phrase(new Date(2026,0,1+i,12))));assert.equal(unique.size,365);});
