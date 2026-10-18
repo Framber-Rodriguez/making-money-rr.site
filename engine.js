@@ -1,7 +1,7 @@
 import {backtest,trainVisual,validateCandles} from './research.mjs';
 import {emailCredentials} from './account-auth.mjs?v=2';
 const API='https://making-money-api.vercel.app',el=id=>document.getElementById(id);
-let learningBusy=false,learningAt=0,learningIdentity='';
+let learningBusy=false,learningAt=0,learningAttemptAt=0,learningIdentity='',learningRetry=null;
 let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false,accountRole='member',accountProfile=null;
 const status=(id,text)=>{const node=el(id);if(!node)return;node.textContent=text;if(id==='registerFeedback'&&text){node.scrollIntoView({block:'center',behavior:'smooth'});node.focus({preventScroll:true});}};
 const minutes=()=>({'1 minute':1,'5 minutes':5,'15 minutes':15,'30 minutes':30,'1 hour':60}[el('tf').value]);
@@ -9,7 +9,7 @@ const selection=()=>({symbol:el('pair').value,minutes:minutes()});
 async function call(op,body,method='POST'){
  const url=new URL('/api/platform',API);url.searchParams.set('op',op);if(method==='GET'&&body)Object.entries(body).forEach(([k,v])=>url.searchParams.set(k,v));
  const response=await fetch(url,{method,headers:{...(body&&method==='POST'?{'Content-Type':'application/json'}:{}),...(session?{Authorization:'Bearer '+session.access_token}:{})},...(body&&method==='POST'?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(65000)});
- const data=await response.json();if(!response.ok)throw Error(data.error||'Service unavailable.');return data;
+ const data=await response.json();if(!response.ok){const error=Error(data.error||'Service unavailable.');error.status=response.status;throw error;}return data;
 }
 window.MMAuthHeaders=()=>session?{Authorization:'Bearer '+session.access_token}:{};
 async function refreshAccount(){
@@ -72,10 +72,11 @@ function receive(detail){
 async function updateServerLearning(detail){
  const identity=detail.symbol+'|'+detail.minutes;
  if(learningBusy||!config?.database||!session||!window.MMAuth.signedIn()||(learningIdentity===identity&&Date.now()-learningAt<300000))return;
- learningBusy=true;learningIdentity=identity;learningAt=Date.now();const userId=session.user.id;
- try{const report=await call('learning',{symbol:detail.symbol,minutes:detail.minutes});
+ if(identity===learningIdentity&&Date.now()-learningAttemptAt<30000)return;
+ clearTimeout(learningRetry);learningBusy=true;learningIdentity=identity;learningAttemptAt=Date.now();const userId=session.user.id;
+ try{const report=await call('learning',{symbol:detail.symbol,minutes:detail.minutes});learningAt=Date.now();
   if(session?.user?.id===userId&&latest?.symbol===detail.symbol&&latest?.minutes===detail.minutes&&window.MMAuth.signedIn())window.dispatchEvent(new CustomEvent('mmlearning',{detail:report}));
- }catch(e){status('learningJournal','Server learning paused: '+e.message);}finally{learningBusy=false;}
+ }catch(e){status('learningJournal','Server learning paused: '+e.message);learningAt=0;if(!e.status||e.status>=500||e.status===429)learningRetry=setTimeout(()=>{if(running&&latest?.symbol===detail.symbol&&latest?.minutes===detail.minutes&&window.MMAuth.signedIn())updateServerLearning(latest);},e.status===429?900000:60000);}finally{learningBusy=false;}
 }
 function selectedData(){const s=selection();if(archiveRows.length&&archiveIdentity===s.symbol+'|'+s.minutes)return archiveRows;if(!latest||latest.symbol!==s.symbol||latest.minutes!==s.minutes)throw Error('Wait for verified prices for this market/timeframe.');return latest.rows;}
 function formatReport(report){
@@ -161,9 +162,10 @@ async function boot(){
  el('logout').onclick=async()=>{await auth?.auth.signOut();session=null;accountRole='member';window.MMAuth.setSession(null);updateControls();stopStream();status('accountStatus','Signed out.');};
  try{el('autoHistory').checked=localStorage.getItem('mm-auto-history')!=='false';}catch{}
  el('autoHistory').onchange=()=>{try{localStorage.setItem('mm-auto-history',String(el('autoHistory').checked));}catch{}};
+ task('refreshLearning',async()=>{const report=await call('learning-status',selection(),'GET');window.dispatchEvent(new CustomEvent('mmlearning',{detail:report}));});
  window.addEventListener('mmprices',e=>{if(window.MMAuth.signedIn())receive(e.detail);});
  window.addEventListener('mmstart',()=>{running=true;latest=null;archiveRows=[];status('backtestResult','Waiting for the selected market’s closed candles.');status('visualResult','Waiting for enough verified chart history.');if(config)startStream();if(session&&config?.history)prepareHistory();});
- window.addEventListener('mmstop',()=>{running=false;latest=null;archiveRows=[];stopStream();status('streamStatus','Stream stopped.');});
+ window.addEventListener('mmstop',()=>{clearTimeout(learningRetry);running=false;latest=null;archiveRows=[];stopStream();status('streamStatus','Stream stopped.');});
  window.addEventListener('pagehide',stopStream);
  window.addEventListener('mmaccess',()=>{if(!window.MMAuth.signedIn())stopStream();});
  setInterval(()=>{if(session)refreshAccount();},60000);window.addEventListener('focus',()=>{if(session)refreshAccount();});

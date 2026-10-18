@@ -620,5 +620,20 @@
   "Check the broader trend and scheduled news; a pattern alone is insufficient.": "Revisa la tendencia general y las noticias programadas; un patrón solo no basta.",
   "Avoid increasing risk to recover a loss. Pause when emotions drive decisions.": "Evita aumentar el riesgo para recuperar una pérdida. Haz una pausa si las emociones dirigen tus decisiones.",
   "Record the setup, decision and outcome. Review a sequence of trades, not one winner.": "Registra la configuración, decisión y resultado. Revisa una serie de operaciones, no solo una ganadora.",
-  "Original rules cover trend, support/resistance, momentum, volatility, volume when available, and 17 candle/price structures. They are not copied book text or a reproduction of any author’s system.": "Las reglas originales cubren tendencia, soporte y resistencia, impulso, volatilidad, volumen cuando está disponible y 17 estructuras de velas y precios. No son texto copiado ni una reproducción del sistema de ningún autor."
+  "Original rules cover trend, support/resistance, momentum, volatility, volume when available, and 17 candle/price structures. They are not copied book text or a reproduction of any author’s system.": "Las reglas originales cubren tendencia, soporte y resistencia, impulso, volatilidad, volumen cuando está disponible y 17 estructuras de velas y precios. No son texto copiado ni una reproducción del sistema de ningún autor.",
+  "Check saved evaluations": "Consultar evaluaciones guardadas",
+  "Historical evaluation only; current prices are not verified.": "Solo evaluación histórica; los precios actuales no están verificados.",
+  "Monitoring with recent closed candles.": "Monitoreo con velas cerradas recientes.",
+  "No saved technical evaluation yet. Start monitoring to create one.": "Aún no hay una evaluación técnica guardada. Inicia el monitoreo para crearla.",
+  "Waiting for provider history.": "Esperando el histórico del proveedor.",
+  "Provider refresh unavailable; using archived candles.": "No se pudo actualizar el proveedor; se usan velas archivadas.",
+  "Last evaluation: ": "Última evaluación: ",
+  "Observed improvement; future performance is uncertain.": "Mejora observada; el desempeño futuro es incierto.",
+  "Improvement not demonstrated.": "Mejora no demostrada.",
+  "Insufficient forward results to measure improvement.": "Faltan resultados futuros evaluados para medir la mejora.",
+  "No scored forward outcomes. ": "Sin resultados futuros evaluados. ",
+  "Direction accuracy: ": "Acierto de dirección: ",
+  "non-overlapping outcomes": "resultados sin solapamiento",
+  "Baseline: ": "Referencia: ",
+  "Accuracy counts the predicted direction against the actual future close. It is not a win rate after trading costs. Improvement requires two separate periods of 100 non-overlapping outcomes for the same horizon.": "El acierto compara la dirección prevista con el cierre futuro real. No mide ganancias tras costos de operación. La mejora requiere dos períodos separados de 100 resultados sin solapamiento para el mismo horizonte."
 }
