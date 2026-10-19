@@ -22,5 +22,24 @@
    li.textContent=h+' min · '+(p?.n?p.n+' non-overlapping outcomes · Direction accuracy: '+(p.accuracy*100).toFixed(1)+'% · Baseline: '+(p.baselineAccuracy*100).toFixed(1)+'%. ':'No scored forward outcomes. ')+trend;$('learningMetrics').append(li);
   }
  });
+ let coverage=null;
+ const stateLabel=m=>m.state==='queued'?'Queued':m.state==='waiting_for_history'?'Provider history unavailable':m.state==='monitoring'?'Recent history saved':m.state==='historical_only'?'Historical data only':'Not started';
+ function paintCoverage(){
+  const host=$('marketCoverageRows');host.replaceChildren();if(!coverage||!window.MMAuth.signedIn())return;
+  const selected=$('pair').value,canonical=selected==='OANDA:XAUUSD'?'XAUUSD':selected;
+  $('selectedMarketCoverage').textContent=coverage.markets.some(m=>m.symbol===canonical)?'Selected market has an automatic price-feed mapping. Actual access depends on the provider.':'Selected symbol is chart-only for automatic learning. A compatible licensed price feed is required.';
+  for(const market of coverage.markets){
+   for(const m of market.timeframes.length?market.timeframes:[{state:'not_started',interval:coverage.defaultInterval}]){
+    const tr=document.createElement('tr');if(market.symbol===canonical)tr.className='selectedMarket';
+    const scores=[5,10,30].map(h=>{const p=m.performance?.horizons?.[h];return h+'m: '+(p?.n?(p.accuracy*100).toFixed(1)+'% (n='+p.n+')':'—');}).join(' / ');
+    for(const text of [market.providerSymbol+' · '+m.interval+'m',stateLabel(m),m.lastCandle?new Date(m.lastCandle).toLocaleString():'—',scores]){const td=document.createElement('td');td.textContent=text;tr.append(td);}host.append(tr);
+   }
+  }
+  const evaluated=coverage.markets.filter(m=>m.timeframes.some(t=>t.lastAttemptAt)).length;
+  $('marketCoverageStatus').textContent='Compatible markets: '+coverage.markets.length+' · Markets with a saved evaluation: '+evaluated+'. A saved evaluation does not establish prediction accuracy.';
+ }
+ window.addEventListener('mmcoverage',e=>{if(!window.MMAuth.signedIn())return;coverage=e.detail;paintCoverage();});
+ $('pair').addEventListener('change',paintCoverage);
+ window.addEventListener('mmsession',()=>{coverage=null;$('marketCoverageRows').replaceChildren();$('selectedMarketCoverage').textContent='';$('marketCoverageStatus').textContent='Sign in to check saved market coverage.';});
  clear();
 })();

@@ -1,6 +1,7 @@
 import {backtest,trainVisual,validateCandles} from './research.mjs';
 import {emailCredentials} from './account-auth.mjs?v=2';
 const API='https://making-money-api.vercel.app',el=id=>document.getElementById(id);
+let coverageAt=0,coverageBusy=false;
 let learningBusy=false,learningAt=0,learningAttemptAt=0,learningIdentity='',learningRetry=null;
 let config=null,auth=null,session=null,latest=null,archiveRows=[],archiveIdentity='',socket=null,retry=null,streamEpoch=0,delay=1000,running=false,streamState=null,visualIdentity='',historyBusy=false,cancelHistory=false,accountRole='member',accountProfile=null;
 const status=(id,text)=>{const node=el(id);if(!node)return;node.textContent=text;if(id==='registerFeedback'&&text){node.scrollIntoView({block:'center',behavior:'smooth'});node.focus({preventScroll:true});}};
@@ -14,8 +15,14 @@ async function call(op,body,method='POST'){
 window.MMAuthHeaders=()=>session?{Authorization:'Bearer '+session.access_token}:{};
 async function refreshAccount(){
  const identity=session?.user?.id;if(!identity){accountRole='member';return;}
- try{const a=await call('account',null,'GET');if(session?.user?.id!==identity)return;accountRole=a.role||'member';accountProfile=a.profile;paintProfile(a);window.MMAuth.setAccount(a);updateControls();status('accountStatus',a.email+' · '+(a.role==='owner'?'Owner access':('Plan: '+a.status)));}
+ try{const a=await call('account',null,'GET');if(session?.user?.id!==identity)return;accountRole=a.role||'member';accountProfile=a.profile;paintProfile(a);window.MMAuth.setAccount(a);updateControls();refreshMarketCoverage();status('accountStatus',a.email+' · '+(a.role==='owner'?'Owner access':('Plan: '+a.status)));}
  catch(e){if(session?.user?.id===identity){accountRole='member';status('accountStatus','Signed in. Account access could not be verified: '+e.message);}}
+}
+async function refreshMarketCoverage(force=false){
+ if(!session||!window.MMAuth.signedIn()||coverageBusy||(!force&&Date.now()-coverageAt<60000))return;
+ coverageBusy=true;const id=session.user.id;
+ try{const report=await call('learning-markets',null,'GET');if(session?.user?.id===id&&window.MMAuth.signedIn()){coverageAt=Date.now();window.dispatchEvent(new CustomEvent('mmcoverage',{detail:report}));}}
+ catch(e){status('marketCoverageStatus','Coverage unavailable: '+e.message);}finally{coverageBusy=false;}
 }
 function paintProfile(account){
  el('profileForm').hidden=!session;
@@ -76,6 +83,7 @@ async function updateServerLearning(detail){
  clearTimeout(learningRetry);learningBusy=true;learningIdentity=identity;learningAttemptAt=Date.now();const userId=session.user.id;
  try{const report=await call('learning',{symbol:detail.symbol,minutes:detail.minutes});learningAt=Date.now();
   if(session?.user?.id===userId&&latest?.symbol===detail.symbol&&latest?.minutes===detail.minutes&&window.MMAuth.signedIn())window.dispatchEvent(new CustomEvent('mmlearning',{detail:report}));
+ refreshMarketCoverage();
  }catch(e){status('learningJournal','Server learning paused: '+e.message);learningAt=0;if(!e.status||e.status>=500||e.status===429)learningRetry=setTimeout(()=>{if(running&&latest?.symbol===detail.symbol&&latest?.minutes===detail.minutes&&window.MMAuth.signedIn())updateServerLearning(latest);},e.status===429?900000:60000);}finally{learningBusy=false;}
 }
 function selectedData(){const s=selection();if(archiveRows.length&&archiveIdentity===s.symbol+'|'+s.minutes)return archiveRows;if(!latest||latest.symbol!==s.symbol||latest.minutes!==s.minutes)throw Error('Wait for verified prices for this market/timeframe.');return latest.rows;}
@@ -162,12 +170,13 @@ async function boot(){
  el('logout').onclick=async()=>{await auth?.auth.signOut();session=null;accountRole='member';window.MMAuth.setSession(null);updateControls();stopStream();status('accountStatus','Signed out.');};
  try{el('autoHistory').checked=localStorage.getItem('mm-auto-history')!=='false';}catch{}
  el('autoHistory').onchange=()=>{try{localStorage.setItem('mm-auto-history',String(el('autoHistory').checked));}catch{}};
+ task('refreshMarketCoverage',()=>refreshMarketCoverage(true));
  task('refreshLearning',async()=>{const report=await call('learning-status',selection(),'GET');window.dispatchEvent(new CustomEvent('mmlearning',{detail:report}));});
  window.addEventListener('mmprices',e=>{if(window.MMAuth.signedIn())receive(e.detail);});
  window.addEventListener('mmstart',()=>{running=true;latest=null;archiveRows=[];status('backtestResult','Waiting for the selected market’s closed candles.');status('visualResult','Waiting for enough verified chart history.');if(config)startStream();if(session&&config?.history)prepareHistory();});
  window.addEventListener('mmstop',()=>{clearTimeout(learningRetry);running=false;latest=null;archiveRows=[];stopStream();status('streamStatus','Stream stopped.');});
  window.addEventListener('pagehide',stopStream);
- window.addEventListener('mmaccess',()=>{if(!window.MMAuth.signedIn())stopStream();});
+ window.addEventListener('mmaccess',()=>{if(!window.MMAuth.signedIn()){stopStream();coverageAt=0;}else refreshMarketCoverage();});
  setInterval(()=>{if(session)refreshAccount();},60000);window.addEventListener('focus',()=>{if(session)refreshAccount();});
  const initial=current();if(initial?.rows?.length)receive(initial);running=!!initial?.active;
  try{
