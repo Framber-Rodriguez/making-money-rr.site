@@ -1,4 +1,5 @@
 (() => {
+ let accountId=null;
  let signed=false,ready=false,pending='',access=null,expires=0,lastAllowed=false;
  const $=id=>document.getElementById(id),allowed=()=>signed&&!!access?.allowed&&(!expires||performance.now()<expires);
  const dialog=()=>$('loginDialog');
@@ -22,14 +23,14 @@
   $('profileBadge').textContent=owner?'Owner':signed?'Signed in':'Guest';$('ownerAccess').hidden=!owner;
   window.dispatchEvent(new Event('mmaccess'));
  }
- window.MMAuth={signedIn:allowed,hasSession:()=>signed,open,openProfile:profile,
+ window.MMAuth={userId:()=>accountId,signedIn:allowed,hasSession:()=>signed,open,openProfile:profile,
   require(action){if(allowed())return true;if(signed){profile();return false;}open(action);return false;},
   setAccount(account){access=account.access||null;expires=access?.trialEndsAt?performance.now()+Math.max(0,access.trialEndsAt-access.serverNow):0;
    const owner=signed&&account.role==='owner';$('profileUsername').hidden=!owner;$('profileUsername').textContent=owner?'Username: '+account.username:'';
    $('billingAvailability').textContent=access?.billingReady?'Secure subscription checkout is available.':'Subscription checkout is awaiting payment-service setup. No payment can be taken yet.';paint();if(account.access?.status==='profile_required')profile();
    if(allowed()&&pending){const action=pending;pending='';try{sessionStorage.removeItem('mm-pending-analysis');}catch{}if(['monitor','analyze'].includes(action))setTimeout(()=>$('live').click(),0);}
   },
-  setSession(next){const changed=signed!==!!next;ready=true;signed=!!next;if(changed||!signed){access=null;expires=0;}
+  setSession(next){const nextId=next?.user?.id||null;const changed=signed!==!!next||accountId!==nextId;accountId=nextId;ready=true;signed=!!next;if(changed||!signed){access=null;expires=0;}
    $('profileEmail').textContent=next?.user?.email||'Sign in to access analysis and your server archive.';$('navLogin').textContent=signed?'My profile':'Sign in / Login';$('navCreate').hidden=signed;
    if(signed){dialog()?.close();$('registerDialog').close();try{pending ||= sessionStorage.getItem('mm-pending-analysis')||'';}catch{}}else{$('profileUsername').hidden=true;window.MMstopAnalysis?.();}paint();window.dispatchEvent(new Event('mmauth'));
   }
