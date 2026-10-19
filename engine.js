@@ -40,6 +40,7 @@ function updateControls(){
 function stopStream(){streamEpoch++;clearTimeout(retry);retry=null;if(socket){socket.onclose=null;socket.close();socket=null;}streamState=null;}
 function startStream(){
  stopStream();if(!running||!window.MMAuth.signedIn())return;const state=current();if(!state?.active)return;
+ if(['BINANCE:BNBUSDT','BINANCE:XRPUSDT'].includes(state.symbol)){status('streamStatus','Binance Spot closed-candle monitoring active. Verified prices refresh every 30 seconds; live ticks are not used for these signals.');return;}
  const crypto={XBTUSD:'BTC/USD',ETHUSD:'ETH/USD',SOLUSD:'SOL/USD'}[state.symbol];
  if(!crypto&&(!config?.websocket?.twelve||!session)){status('streamStatus','Closed-candle REST monitoring active. This market’s streaming requires sign-in and provider WebSocket access.');return;}
  const epoch=streamEpoch;delay=1000;streamState=state;

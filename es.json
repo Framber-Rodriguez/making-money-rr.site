@@ -664,5 +664,13 @@
   "The provider plan does not authorize this feed. Confirm symbol coverage and commercial access with the provider.": "El plan del proveedor no autoriza esta fuente. Confirma la cobertura del símbolo y el acceso comercial con el proveedor.",
   "The provider did not recognize this market mapping. Verify the instrument and exchange in its symbol catalog.": "El proveedor no reconoce este símbolo. Verifica el instrumento y la bolsa en su catálogo.",
   "The provider returned no price history for this market and timeframe.": "El proveedor no devolvió histórico para este mercado y temporalidad.",
-  "The price provider could not supply this feed. Try again later.": "El proveedor no pudo entregar esta fuente de precios. Inténtalo más tarde."
+  "The price provider could not supply this feed. Try again later.": "El proveedor no pudo entregar esta fuente de precios. Inténtalo más tarde.",
+  "Automatic analysis uses Binance Spot public candles for this exact USDT pair. Closed candles refresh every 30 seconds while monitoring is active.": "El análisis automático usa velas públicas de Binance Spot para este par USDT exacto. Las velas cerradas se actualizan cada 30 segundos durante el monitoreo.",
+  "Binance Spot closed-candle monitoring active. Verified prices refresh every 30 seconds; live ticks are not used for these signals.": "Monitoreo de velas cerradas de Binance Spot activo. Los precios verificados se actualizan cada 30 segundos; estas señales no usan ticks en vivo.",
+  "Binance market data is temporarily unavailable.": "Los datos de Binance no están disponibles temporalmente.",
+  "Binance market-data requests are rate limited. Wait before retrying.": "Se alcanzó el límite de consultas de Binance. Espera antes de volver a intentarlo.",
+  "Binance market data is unavailable from this server location. No alternate venue has been substituted.": "Los datos de Binance no están disponibles desde la ubicación de este servidor. No se sustituyó por otra bolsa.",
+  "Binance did not supply market data.": "Binance no entregó datos de mercado.",
+  "Binance returned no usable price history.": "Binance no devolvió un histórico de precios utilizable.",
+  "Binance returned invalid candles.": "Binance devolvió velas inválidas."
 }
