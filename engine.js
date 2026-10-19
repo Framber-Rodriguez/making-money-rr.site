@@ -91,7 +91,7 @@ function formatReport(report){
  const rate=v=>v==null?'No trades':v.toFixed(1)+'%';
  return 'Sample: '+new Date(report.coverage.from).toLocaleDateString()+' – '+new Date(report.coverage.to).toLocaleDateString()+' · '+report.coverage.candles+' candles. '+report.all.trades+' simulated trades · net win rate '+rate(report.all.winRate)+' · net P/L '+report.all.netPnl.toFixed(2)+' · maximum closed-trade drawdown '+report.all.maxDrawdown.toFixed(2)+' (quote currency, one unit). Last 30% holdout: '+report.holdout.trades+' trades, '+rate(report.holdout.winRate)+'. Skipped incomplete/gapped horizons: '+report.skipped+'. '+report.limitations;
 }
-function task(id,fn){el(id).addEventListener('click',async()=>{if(!['subscribePlan','managePlan'].includes(id)&&!window.MMAuth.require(id))return;if(!session){window.MMAuth.open();return;}const button=el(id);button.disabled=true;try{await fn();}catch(e){status(['subscribePlan','managePlan'].includes(id)?'billingFeedback':'serviceFeedback',e.message);}finally{updateControls();if(['runBacktest','trainVisual'].includes(id))button.disabled=false;}});}
+function task(id,fn){el(id).addEventListener('click',async()=>{if(!['subscribePlan','managePlan'].includes(id)&&!window.MMAuth.require(id))return;if(!session){window.MMAuth.open();return;}const button=el(id);button.disabled=true;try{await fn();}catch(e){status(['subscribePlan','managePlan'].includes(id)?'billingFeedback':'serviceFeedback',e.message);}finally{updateControls();if(['runBacktest','trainVisual','refreshLearning','refreshMarketCoverage'].includes(id))button.disabled=false;}});}
 async function loadHistory(s=selection(),full=false){
  const data=[];let offset=0;
  for(let i=0;i<(full?60:4);i++){if(!window.MMAuth.signedIn())break;const r=await call('history',{...s,offset,recent:true},'GET');data.push(...r.candles);status('archiveProgress','Loading archive: '+data.length+' candles…');if(r.next===null)break;offset=r.next;}
@@ -176,6 +176,7 @@ async function boot(){
  window.addEventListener('mmstart',()=>{running=true;latest=null;archiveRows=[];status('backtestResult','Waiting for the selected market’s closed candles.');status('visualResult','Waiting for enough verified chart history.');if(config)startStream();if(session&&config?.history)prepareHistory();});
  window.addEventListener('mmstop',()=>{clearTimeout(learningRetry);running=false;latest=null;archiveRows=[];stopStream();status('streamStatus','Stream stopped.');});
  window.addEventListener('pagehide',stopStream);
+ window.addEventListener('mmsession',()=>{coverageAt=0;});
  window.addEventListener('mmaccess',()=>{if(!window.MMAuth.signedIn()){stopStream();coverageAt=0;}else refreshMarketCoverage();});
  setInterval(()=>{if(session)refreshAccount();},60000);window.addEventListener('focus',()=>{if(session)refreshAccount();});
  const initial=current();if(initial?.rows?.length)receive(initial);running=!!initial?.active;
