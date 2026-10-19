@@ -32,7 +32,7 @@
    for(const m of market.timeframes.length?market.timeframes:[{state:'not_started',interval:coverage.defaultInterval}]){
     const tr=document.createElement('tr');if(market.symbol===canonical)tr.className='selectedMarket';
     const scores=[5,10,30].map(h=>{const p=m.performance?.horizons?.[h];return h+'m: '+(p?.n?(p.accuracy*100).toFixed(1)+'% (n='+p.n+')':'—');}).join(' / ');
-    for(const text of [market.providerSymbol+' · '+m.interval+'m',stateLabel(m),m.lastCandle?new Date(m.lastCandle).toLocaleString():'—',scores]){const td=document.createElement('td');td.textContent=text;tr.append(td);}host.append(tr);
+    for(const text of [market.providerSymbol+' · '+m.interval+'m',stateLabel(m)+(m.feed?.issue?.reason?' · '+m.feed.issue.reason:''),m.lastCandle?new Date(m.lastCandle).toLocaleString():'—',scores]){const td=document.createElement('td');td.textContent=text;tr.append(td);}host.append(tr);
    }
   }
   const evaluated=coverage.markets.filter(m=>m.timeframes.some(t=>t.lastAttemptAt)).length;
