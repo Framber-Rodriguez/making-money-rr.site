@@ -36,7 +36,9 @@
    }
   }
   const evaluated=coverage.markets.filter(m=>m.timeframes.some(t=>t.lastAttemptAt)).length;
-  $('marketCoverageStatus').textContent='Compatible markets: '+coverage.markets.length+' · Markets with a saved evaluation: '+evaluated+'. A saved evaluation does not establish prediction accuracy.';
+  const w=coverage.worker,stamp=w?.completed_at;
+  const workerText=w?' Server worker: '+w.status+' · last completed: '+(stamp?new Date(stamp).toLocaleString():'awaiting first run')+(stamp&&Date.now()-Date.parse(stamp)>900000?' · delayed; inspect server schedule':'')+'. Checks every 5 minutes while this page is closed. Binance USDT journals are prioritized; Twelve Data markets rotate, up to 2 requests per cycle and 576 per UTC day.':' Server worker status unavailable.';
+  $('marketCoverageStatus').textContent='Compatible markets: '+coverage.markets.length+' · Markets with a saved evaluation: '+evaluated+'. A saved evaluation does not establish prediction accuracy.'+workerText;
  }
  window.addEventListener('mmcoverage',e=>{if(!window.MMAuth.signedIn())return;coverage=e.detail;paintCoverage();});
  $('pair').addEventListener('change',paintCoverage);
